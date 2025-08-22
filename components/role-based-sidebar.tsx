@@ -377,8 +377,8 @@ export function RoleBasedSidebar() {
   const currentRole = "Sales Manager"
   const navigation = roleBasedNavigation[currentRole] || []
   
-  // Initialize with Activities category expanded by default (as per screenshot design)  
-  const [expandedCategories, setExpandedCategories] = useState<string[]>(["Activities"])
+  // Initialize with no categories expanded by default  
+  const [expandedCategories, setExpandedCategories] = useState<string[]>([])
 
   // Get active category based on current path
   const getActiveCategory = () => {
@@ -400,15 +400,13 @@ export function RoleBasedSidebar() {
     setExpandedCategories(prev => {
       const newExpanded = []
       
-      // Always add the active category (the one containing the current page)
+      // Only expand the category if we're actively in one of its child pages
       if (activeCategory) {
         newExpanded.push(activeCategory)
       }
       
-      // If no active category and we're on dashboard, expand Activities by default
-      if (!activeCategory && pathname === "/") {
-        newExpanded.push("Activities")
-      }
+      // Don't expand anything by default on dashboard
+      // User must click to expand categories
       
       return newExpanded
     })
@@ -464,42 +462,21 @@ export function RoleBasedSidebar() {
         </div>
 
         <ScrollArea className="flex-1 px-3 py-4">
-          <nav 
-            className="space-y-1"
-            onMouseLeave={() => {
-              if (!collapsed) {
-                setExpandedCategories([])
-              }
-            }}
-          >
+          <nav className="space-y-1">
             {navigation.map((item) => {
               if (item.type === "category") {
                 const isExpanded = expandedCategories.includes(item.name)
                 const hasActiveChild = item.children?.some(child => pathname === child.href)
                 
                 return (
-                  <div 
-                    key={item.name}
-                    className="relative"
-                    onMouseEnter={() => {
-                      if (!collapsed) {
-                        setExpandedCategories([item.name])
-                      }
-                    }}
-                  >
-                    {/* Invisible hover zone that extends upward to catch cursor from previous expanded items */}
-                    <div 
-                      className="absolute -top-4 left-0 right-0 h-4 z-10"
-                      onMouseEnter={() => {
-                        if (!collapsed) {
-                          setExpandedCategories([item.name])
-                        }
-                      }}
-                    />
-                    <div
+                  <div key={item.name}>
+                    <button
+                      onClick={() => toggleCategory(item.name)}
                       className={cn(
-                        "w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 group cursor-pointer relative",
-                        "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                        "w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 group",
+                        hasActiveChild
+                          ? "bg-blue-50 text-blue-700 shadow-sm"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                         collapsed && "justify-center",
                       )}
                     >
@@ -507,7 +484,7 @@ export function RoleBasedSidebar() {
                         className={cn(
                           "flex-shrink-0 w-5 h-5 transition-colors",
                           collapsed ? "mr-0" : "mr-3",
-                          "text-gray-400 group-hover:text-gray-600",
+                          hasActiveChild ? "text-blue-700" : "text-gray-400 group-hover:text-gray-600",
                         )}
                       />
                       {!collapsed && (
@@ -520,7 +497,7 @@ export function RoleBasedSidebar() {
                           )}
                         </>
                       )}
-                    </div>
+                    </button>
                     
                     {!collapsed && isExpanded && item.children && (
                       <div className="ml-6 mt-1 space-y-1">
