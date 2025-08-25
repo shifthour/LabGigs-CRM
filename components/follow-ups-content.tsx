@@ -6,10 +6,29 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Bell, Clock, Users, Calendar, CheckCircle2, AlertCircle, Brain, Sparkles, Phone, Mail, MessageSquare, ArrowRight, TrendingUp, Filter } from "lucide-react"
+import { Bell, Clock, Users, Calendar, CheckCircle2, AlertCircle, Brain, Sparkles, Phone, Mail, MessageSquare, ArrowRight, TrendingUp, Filter, X, Plus, Linkedin, Video } from "lucide-react"
+
+// Custom WhatsApp Icon Component
+const WhatsAppIcon = ({ className }: { className?: string }) => (
+  <svg 
+    className={className}
+    viewBox="0 0 24 24" 
+    fill="currentColor"
+  >
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893A11.821 11.821 0 0020.884 3.690z"/>
+  </svg>
+)
 
 export function FollowUpsContent() {
   const [selectedFilter, setSelectedFilter] = useState("all")
+  const [showFilterModal, setShowFilterModal] = useState(false)
+  const [showReminderModal, setShowReminderModal] = useState(false)
+  const [filters, setFilters] = useState({
+    priority: "all",
+    type: "all",
+    contact: "all",
+    dateRange: "all"
+  })
 
   const followUps = {
     overdue: [
@@ -17,23 +36,31 @@ export function FollowUpsContent() {
         id: 1,
         account: "Kerala Agricultural University",
         contact: "Dr. Priya Sharma",
+        phone: "+91 9845123456",
+        email: "priya.sharma@kau.in",
+        whatsapp: "+91 9845123456",
         lastContact: "30 days ago",
         type: "Installation feedback",
         priority: "high",
         aiScore: 85,
         suggestedAction: "Call immediately - Risk of churn",
-        preferredChannel: "phone"
+        preferredChannel: "phone",
+        availableChannels: ["phone", "email", "whatsapp"]
       },
       {
         id: 2,
         account: "Eurofins Advinus",
         contact: "Mr. Rajesh Kumar",
+        phone: "+91 9876543210",
+        email: "rajesh.kumar@eurofins.com",
+        whatsapp: "+91 9876543210",
         lastContact: "15 days ago",
         type: "Quotation follow-up",
         priority: "high",
         aiScore: 78,
         suggestedAction: "Send reminder email with discount offer",
-        preferredChannel: "email"
+        preferredChannel: "email",
+        availableChannels: ["phone", "email", "whatsapp"]
       }
     ],
     today: [
@@ -41,34 +68,47 @@ export function FollowUpsContent() {
         id: 3,
         account: "TSAR Labcare",
         contact: "Mr. Mahesh",
+        phone: "+91 9988776655",
+        email: "mahesh@tsarlabcare.com",
+        whatsapp: "+91 9988776655",
+        linkedin: "https://linkedin.com/in/mahesh-tsar",
         lastContact: "7 days ago",
         type: "Demo follow-up",
         priority: "high",
         aiScore: 92,
         suggestedAction: "Close the deal - High probability",
-        preferredChannel: "phone"
+        preferredChannel: "phone",
+        availableChannels: ["phone", "email", "whatsapp", "meeting"]
       },
       {
         id: 4,
         account: "JNCASR",
         contact: "Dr. Anu Rang",
+        phone: "+91 9123456789",
+        email: "anu.rang@jncasr.ac.in",
+        whatsapp: "+91 9123456789",
         lastContact: "3 days ago",
         type: "Support ticket",
         priority: "medium",
         aiScore: 65,
         suggestedAction: "Check resolution status",
-        preferredChannel: "email"
+        preferredChannel: "email",
+        availableChannels: ["phone", "email", "whatsapp"]
       },
       {
         id: 5,
         account: "Guna Foods",
         contact: "Pauline",
+        phone: "+91 9445566778",
+        email: "pauline@gunafoods.com",
+        whatsapp: "+91 9445566778",
         lastContact: "5 days ago",
         type: "Product inquiry",
         priority: "medium",
         aiScore: 72,
         suggestedAction: "Send product catalog",
-        preferredChannel: "whatsapp"
+        preferredChannel: "whatsapp",
+        availableChannels: ["phone", "email", "whatsapp"]
       }
     ],
     upcoming: [
@@ -76,23 +116,31 @@ export function FollowUpsContent() {
         id: 6,
         account: "Bio-Rad Laboratories",
         contact: "Mr. Sanjay",
+        phone: "+91 9876512345",
+        email: "sanjay@bio-rad.com",
+        whatsapp: "+91 9876512345",
         dueDate: "Tomorrow",
         type: "Contract renewal",
         priority: "high",
         aiScore: 88,
         suggestedAction: "Prepare renewal proposal with upsell",
-        preferredChannel: "meeting"
+        preferredChannel: "meeting",
+        availableChannels: ["phone", "email", "whatsapp", "meeting"]
       },
       {
         id: 7,
         account: "Thermo Fisher",
         contact: "Ms. Anjali",
+        phone: "+91 9654321087",
+        email: "anjali@thermofisher.com",
+        whatsapp: "+91 9654321087",
         dueDate: "In 3 days",
         type: "Training session",
         priority: "low",
         aiScore: 55,
         suggestedAction: "Confirm attendance and materials",
-        preferredChannel: "email"
+        preferredChannel: "email",
+        availableChannels: ["phone", "email", "whatsapp"]
       }
     ]
   }
@@ -130,9 +178,38 @@ export function FollowUpsContent() {
     switch(channel) {
       case 'phone': return <Phone className="w-4 h-4" />
       case 'email': return <Mail className="w-4 h-4" />
-      case 'whatsapp': return <MessageSquare className="w-4 h-4" />
+      case 'whatsapp': return <WhatsAppIcon className="w-4 h-4 text-green-600" />
       case 'meeting': return <Users className="w-4 h-4" />
+      case 'linkedin': return <Linkedin className="w-4 h-4" />
+      case 'video': return <Video className="w-4 h-4" />
       default: return <Bell className="w-4 h-4" />
+    }
+  }
+
+  const handleCommunicationAction = (action: string, contact: any) => {
+    switch(action) {
+      case 'phone':
+        window.open(`tel:${contact.phone}`)
+        break
+      case 'whatsapp':
+        const message = encodeURIComponent(`Hi ${contact.contact.split(' ')[0]}, following up on ${contact.type.toLowerCase()} for ${contact.account}. When would be a good time to discuss?`)
+        window.open(`https://wa.me/${contact.whatsapp.replace(/[^0-9]/g, '')}?text=${message}`)
+        break
+      case 'email':
+        const subject = encodeURIComponent(`Follow-up: ${contact.type} - ${contact.account}`)
+        const body = encodeURIComponent(`Dear ${contact.contact},\n\nI hope this email finds you well. I'm following up on our ${contact.type.toLowerCase()} discussion regarding ${contact.account}.\n\n${contact.suggestedAction}\n\nLooking forward to hearing from you.\n\nBest regards,\nPrashanth S.\nLabGig CRM`)
+        window.open(`mailto:${contact.email}?subject=${subject}&body=${body}`)
+        break
+      case 'linkedin':
+        if (contact.linkedin) {
+          window.open(contact.linkedin, '_blank')
+        }
+        break
+      case 'meeting':
+        alert(`Schedule meeting with ${contact.contact} at ${contact.account}`)
+        break
+      default:
+        alert(`Initiating ${action} with ${contact.contact}`)
     }
   }
 
@@ -145,11 +222,14 @@ export function FollowUpsContent() {
           <p className="text-gray-500 mt-1">AI-powered follow-up management and reminders</p>
         </div>
         <div className="flex items-center space-x-3">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => setShowFilterModal(true)}>
             <Filter className="w-4 h-4 mr-2" />
             Filter
+            {(filters.priority !== "all" || filters.type !== "all" || filters.contact !== "all" || filters.dateRange !== "all") && (
+              <Badge className="ml-2 bg-blue-500 text-white text-xs w-2 h-2 p-0 flex items-center justify-center">•</Badge>
+            )}
           </Button>
-          <Button className="bg-blue-600 hover:bg-blue-700" size="sm">
+          <Button className="bg-blue-600 hover:bg-blue-700" size="sm" onClick={() => setShowReminderModal(true)}>
             <Bell className="w-4 h-4 mr-2" />
             Set Reminder
           </Button>
@@ -309,10 +389,34 @@ export function FollowUpsContent() {
                         <p className="text-sm text-purple-900">{followUp.suggestedAction}</p>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end space-y-2">
-                      <Button size="sm" className="bg-red-600 hover:bg-red-700">
-                        {getChannelIcon(followUp.preferredChannel)}
-                        <span className="ml-2">Contact Now</span>
+                    <div className="flex items-center space-x-2">
+                      {/* Communication Icons in single line */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-8 h-8 p-0 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                        onClick={() => handleCommunicationAction('phone', followUp)}
+                        title="Call Contact"
+                      >
+                        <Phone className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-8 h-8 p-0 text-orange-600 hover:text-orange-800 hover:bg-orange-50"
+                        onClick={() => handleCommunicationAction('email', followUp)}
+                        title="Send Email"
+                      >
+                        <Mail className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-8 h-8 p-0 text-green-600 hover:text-green-800 hover:bg-green-50"
+                        onClick={() => handleCommunicationAction('whatsapp', followUp)}
+                        title="WhatsApp Contact"
+                      >
+                        <WhatsAppIcon className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
@@ -348,10 +452,34 @@ export function FollowUpsContent() {
                         <p className="text-sm text-purple-900">{followUp.suggestedAction}</p>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end space-y-2">
-                      <Button size="sm" variant={followUp.priority === 'high' ? 'default' : 'outline'}>
-                        {getChannelIcon(followUp.preferredChannel)}
-                        <span className="ml-2">Follow-up</span>
+                    <div className="flex items-center space-x-2">
+                      {/* Communication Icons in single line */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-8 h-8 p-0 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                        onClick={() => handleCommunicationAction('phone', followUp)}
+                        title="Call Contact"
+                      >
+                        <Phone className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-8 h-8 p-0 text-orange-600 hover:text-orange-800 hover:bg-orange-50"
+                        onClick={() => handleCommunicationAction('email', followUp)}
+                        title="Send Email"
+                      >
+                        <Mail className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-8 h-8 p-0 text-green-600 hover:text-green-800 hover:bg-green-50"
+                        onClick={() => handleCommunicationAction('whatsapp', followUp)}
+                        title="WhatsApp Contact"
+                      >
+                        <WhatsAppIcon className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
@@ -383,10 +511,34 @@ export function FollowUpsContent() {
                         <p className="text-sm text-gray-700">{followUp.suggestedAction}</p>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end space-y-2">
-                      <Button size="sm" variant="outline">
-                        {getChannelIcon(followUp.preferredChannel)}
-                        <span className="ml-2">Schedule</span>
+                    <div className="flex items-center space-x-2">
+                      {/* Communication Icons in single line */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-8 h-8 p-0 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                        onClick={() => handleCommunicationAction('phone', followUp)}
+                        title="Call Contact"
+                      >
+                        <Phone className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-8 h-8 p-0 text-orange-600 hover:text-orange-800 hover:bg-orange-50"
+                        onClick={() => handleCommunicationAction('email', followUp)}
+                        title="Send Email"
+                      >
+                        <Mail className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-8 h-8 p-0 text-green-600 hover:text-green-800 hover:bg-green-50"
+                        onClick={() => handleCommunicationAction('whatsapp', followUp)}
+                        title="WhatsApp Contact"
+                      >
+                        <WhatsAppIcon className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
@@ -396,6 +548,230 @@ export function FollowUpsContent() {
           </Tabs>
         </CardContent>
       </Card>
+
+      {/* Filter Modal */}
+      {showFilterModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Filter Follow-ups</h3>
+              <Button variant="ghost" size="sm" onClick={() => setShowFilterModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                <select 
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={filters.priority}
+                  onChange={(e) => setFilters({...filters, priority: e.target.value})}
+                >
+                  <option value="all">All Priorities</option>
+                  <option value="high">High Priority</option>
+                  <option value="medium">Medium Priority</option>
+                  <option value="low">Low Priority</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Follow-up Type</label>
+                <select 
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={filters.type}
+                  onChange={(e) => setFilters({...filters, type: e.target.value})}
+                >
+                  <option value="all">All Types</option>
+                  <option value="Demo follow-up">Demo Follow-up</option>
+                  <option value="Quotation follow-up">Quotation Follow-up</option>
+                  <option value="Installation feedback">Installation Feedback</option>
+                  <option value="Support ticket">Support Ticket</option>
+                  <option value="Product inquiry">Product Inquiry</option>
+                  <option value="Contract renewal">Contract Renewal</option>
+                  <option value="Training session">Training Session</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Contact Channel</label>
+                <select 
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={filters.contact}
+                  onChange={(e) => setFilters({...filters, contact: e.target.value})}
+                >
+                  <option value="all">All Channels</option>
+                  <option value="phone">Phone</option>
+                  <option value="email">Email</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="meeting">Meeting</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+                <select 
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={filters.dateRange}
+                  onChange={(e) => setFilters({...filters, dateRange: e.target.value})}
+                >
+                  <option value="all">All Dates</option>
+                  <option value="overdue">Overdue</option>
+                  <option value="today">Today</option>
+                  <option value="tomorrow">Tomorrow</option>
+                  <option value="thisWeek">This Week</option>
+                  <option value="nextWeek">Next Week</option>
+                </select>
+              </div>
+              
+              {/* Active Filters Summary */}
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="text-sm font-medium text-gray-700 mb-1">Active Filters:</p>
+                <div className="flex flex-wrap gap-1">
+                  {filters.priority !== "all" && <Badge variant="outline" className="text-xs">Priority: {filters.priority}</Badge>}
+                  {filters.type !== "all" && <Badge variant="outline" className="text-xs">Type: {filters.type}</Badge>}
+                  {filters.contact !== "all" && <Badge variant="outline" className="text-xs">Channel: {filters.contact}</Badge>}
+                  {filters.dateRange !== "all" && <Badge variant="outline" className="text-xs">Date: {filters.dateRange}</Badge>}
+                  {filters.priority === "all" && filters.type === "all" && filters.contact === "all" && filters.dateRange === "all" && (
+                    <span className="text-xs text-gray-500">No filters applied</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between mt-6">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setFilters({ priority: "all", type: "all", contact: "all", dateRange: "all" })
+                }}
+              >
+                Clear All
+              </Button>
+              <div className="flex items-center space-x-3">
+                <Button variant="outline" onClick={() => setShowFilterModal(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  className="bg-blue-600 hover:bg-blue-700" 
+                  onClick={() => setShowFilterModal(false)}
+                >
+                  Apply Filters
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set Reminder Modal */}
+      {showReminderModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Set Follow-up Reminder</h3>
+              <Button variant="ghost" size="sm" onClick={() => setShowReminderModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Account/Contact</label>
+                <select className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">Select account...</option>
+                  <option value="tsar">TSAR Labcare - Mr. Mahesh</option>
+                  <option value="kerala">Kerala Agricultural University - Dr. Priya Sharma</option>
+                  <option value="eurofins">Eurofins Advinus - Mr. Rajesh Kumar</option>
+                  <option value="jncasr">JNCASR - Dr. Anu Rang</option>
+                  <option value="guna">Guna Foods - Pauline</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reminder Title</label>
+                <input 
+                  type="text" 
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Follow-up on quotation discussion..."
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                  <input 
+                    type="date" 
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    defaultValue={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+                  <input 
+                    type="time" 
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    defaultValue="10:00"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reminder Type</label>
+                <select className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="phone">Phone Call</option>
+                  <option value="email">Email</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="meeting">Meeting</option>
+                  <option value="task">Task</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                <select className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
+                <textarea 
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Additional context or talking points..."
+                ></textarea>
+              </div>
+
+              {/* AI Suggestions */}
+              <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Brain className="w-4 h-4 text-purple-600" />
+                  <span className="text-sm font-medium text-purple-900">🤖 AI Suggestions</span>
+                </div>
+                <p className="text-xs text-purple-800">Based on contact history, 10-11 AM calls have 40% better response rate for this contact.</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-end space-x-3 mt-6">
+              <Button variant="outline" onClick={() => setShowReminderModal(false)}>
+                Cancel
+              </Button>
+              <Button 
+                className="bg-blue-600 hover:bg-blue-700" 
+                onClick={() => {
+                  alert('Reminder would be saved to calendar and notification system')
+                  setShowReminderModal(false)
+                }}
+              >
+                Set Reminder
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

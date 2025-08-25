@@ -52,22 +52,22 @@ export class AILeadScoringService {
     
     // Company type scoring based on research domain
     const researchIndicators = ['university', 'college', 'research', 'pharma', 'biotech', 'laboratory', 'institute']
-    const companyName = lead.leadName.toLowerCase()
+    const companyName = lead.leadName?.toLowerCase() || ''
     if (researchIndicators.some(indicator => companyName.includes(indicator))) {
       score += 25
     }
     
     // Product category scoring
     const highValueProducts = ['freeze dryer', 'lyophilizer', 'spectrophotometer', 'autoclave', 'biosafety cabinet']
-    const product = lead.product.toLowerCase()
-    if (highValueProducts.some(productType => product.includes(productType))) {
+    const product = lead.product?.toLowerCase() || ''
+    if (product && highValueProducts.some(productType => product.includes(productType))) {
       score += 20
     }
     
     // Location scoring (tier-1 cities and research hubs)
     const tier1Cities = ['bangalore', 'mumbai', 'delhi', 'chennai', 'hyderabad', 'pune', 'kolkata']
-    const location = lead.location.toLowerCase()
-    if (tier1Cities.some(city => location.includes(city))) {
+    const location = lead.location?.toLowerCase() || ''
+    if (location && tier1Cities.some(city => location.includes(city))) {
       score += 15
     }
     
@@ -82,7 +82,7 @@ export class AILeadScoringService {
       'proposal': 25,
       'negotiation': 35
     }
-    score += stageScores[lead.salesStage.toLowerCase()] || 0
+    score += stageScores[lead.salesStage?.toLowerCase() || ''] || 0
     
     // Priority boost
     if (lead.priority === 'high') score += 10
@@ -223,13 +223,13 @@ export class AIRecommendationService {
     let action: string
     let priority: 'low' | 'medium' | 'high' | 'critical'
     
-    if (lead.salesStage.toLowerCase() === 'prospecting') {
+    if (lead.salesStage?.toLowerCase() === 'prospecting') {
       action = `Schedule a technical discussion with ${lead.contactName} about ${lead.product} requirements`
       priority = 'high'
-    } else if (lead.salesStage.toLowerCase() === 'qualified') {
+    } else if (lead.salesStage?.toLowerCase() === 'qualified') {
       action = `Prepare detailed quotation for ${lead.product} and schedule presentation`
       priority = 'high'
-    } else if (lead.salesStage.toLowerCase() === 'proposal') {
+    } else if (lead.salesStage?.toLowerCase() === 'proposal') {
       action = `Follow up on submitted proposal and address any technical questions`
       priority = 'medium'
     } else {
@@ -312,7 +312,7 @@ Best regards,
 ${lead.assignedTo}`
     }
     
-    const stage = lead.salesStage.toLowerCase()
+    const stage = lead.salesStage?.toLowerCase() || ''
     return templates[stage] || templates.prospecting
   }
   

@@ -1,13 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Download, Eye, Edit, FileText, Send, Printer } from "lucide-react"
+import { Plus, Search, Download, Eye, Edit, FileText, Send, Printer, Upload } from "lucide-react"
+import { AddQuotationModal } from "@/components/add-quotation-modal"
+import { DataImportModal } from "@/components/data-import-modal"
+import { useToast } from "@/hooks/use-toast"
+import storageService from "@/lib/localStorage-service"
 
 const quotations = [
   {
@@ -63,8 +67,124 @@ const quotations = [
 const statuses = ["All", "Draft", "Sent", "Under Review", "Accepted", "Rejected", "Expired"]
 
 export function QuotationsContent() {
+  const { toast } = useToast()
+  const [quotationsList, setQuotationsList] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("All")
+  const [isAddQuotationModalOpen, setIsAddQuotationModalOpen] = useState(false)
+  const [isDataImportModalOpen, setIsDataImportModalOpen] = useState(false)
+  const [editingQuotation, setEditingQuotation] = useState<any>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [quotationStats, setQuotationStats] = useState({
+    total: 0,
+    pendingReview: 0,
+    acceptanceRate: 0,
+    totalValue: 0,
+    thisMonthCount: 0
+  })
+
+  // Load quotations from localStorage on component mount
+  useEffect(() => {
+    loadQuotations()
+  }, [])
+
+  const loadQuotations = () => {
+    const storedQuotations = storageService.getAll<any>('quotations')
+    console.log("loadQuotations - storedQuotations:", storedQuotations)
+    setQuotationsList(storedQuotations)
+    
+    // Calculate stats
+    const stats = storageService.getStats('quotations')
+    const pendingReview = storedQuotations.filter(q => q.status === 'Under Review' || q.status === 'Sent').length
+    const accepted = storedQuotations.filter(q => q.status === 'Accepted').length
+    const acceptanceRate = storedQuotations.length > 0 ? Math.round((accepted / storedQuotations.length) * 100) : 0
+    const totalValue = storedQuotations.reduce((sum, q) => {
+      const value = parseFloat(q.amount?.replace(/[₹,]/g, '') || '0')
+      return sum + value
+    }, 0)
+    
+    // Calculate this month's quotations
+    const currentMonth = new Date().getMonth()
+    const currentYear = new Date().getFullYear()
+    const thisMonthCount = storedQuotations.filter(q => {
+      const quotationDate = new Date(q.date || q.createdAt || Date.now())
+      return quotationDate.getMonth() === currentMonth && quotationDate.getFullYear() === currentYear
+    }).length
+    
+    setQuotationStats({
+      total: stats.total,
+      pendingReview: pendingReview,
+      acceptanceRate: acceptanceRate,
+      totalValue: totalValue,
+      thisMonthCount: thisMonthCount
+    })
+  }
+
+  const handleSaveQuotation = (quotationData: any) => {
+    console.log("handleSaveQuotation called with:", quotationData)
+    
+    const newQuotation = storageService.create('quotations', quotationData)
+    console.log("New quotation created:", newQuotation)
+    
+    if (newQuotation) {
+      // Force immediate refresh from localStorage
+      const refreshedQuotations = storageService.getAll<any>('quotations')
+      console.log("Force refresh - all quotations:", refreshedQuotations)
+      setQuotationsList(refreshedQuotations)
+      
+      // Update stats
+      loadQuotations()
+      
+      toast({
+        title: "Quotation created",
+        description: `Quotation ${newQuotation.quotationId || newQuotation.id} has been successfully created.`
+      })
+      setIsAddQuotationModalOpen(false)
+    } else {
+      console.error("Failed to create quotation")
+      toast({
+        title: "Error",
+        description: "Failed to create quotation",
+        variant: "destructive"
+      })
+    }
+  }
+  
+  const handleEditQuotation = (quotation: any) => {
+    setEditingQuotation(quotation)
+    setIsEditModalOpen(true)
+  }
+  
+  const handleUpdateQuotation = (quotationData: any) => {
+    console.log("handleUpdateQuotation called with:", quotationData)
+    
+    const updatedQuotation = storageService.update('quotations', editingQuotation.id, quotationData)
+    console.log("Updated quotation:", updatedQuotation)
+    
+    if (updatedQuotation) {
+      // Force immediate refresh from localStorage
+      const refreshedQuotations = storageService.getAll<any>('quotations')
+      console.log("Force refresh - all quotations:", refreshedQuotations)
+      setQuotationsList(refreshedQuotations)
+      
+      // Update stats
+      loadQuotations()
+      
+      toast({
+        title: "Quotation updated",
+        description: `Quotation ${updatedQuotation.quotationId || updatedQuotation.id} has been successfully updated.`
+      })
+      setIsEditModalOpen(false)
+      setEditingQuotation(null)
+    } else {
+      console.error("Failed to update quotation")
+      toast({
+        title: "Error",
+        description: "Failed to update quotation",
+        variant: "destructive"
+      })
+    }
+  }
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -85,6 +205,19 @@ export function QuotationsContent() {
     }
   }
 
+  // Filter quotations based on search and status
+  const filteredQuotations = quotationsList.filter(quotation => {
+    const matchesSearch = searchTerm === "" || 
+      quotation.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      quotation.quotationId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      quotation.accountName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      quotation.product?.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesStatus = selectedStatus === "All" || quotation.status === selectedStatus
+
+    return matchesSearch && matchesStatus
+  })
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -97,7 +230,11 @@ export function QuotationsContent() {
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
-          <Button>
+          <Button onClick={() => setIsDataImportModalOpen(true)} variant="outline">
+            <Upload className="w-4 h-4 mr-2" />
+            Import Quotations
+          </Button>
+          <Button onClick={() => setIsAddQuotationModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
             <Plus className="w-4 h-4 mr-2" />
             Create Quotation
           </Button>
@@ -112,8 +249,8 @@ export function QuotationsContent() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">47</div>
-            <p className="text-xs text-muted-foreground">+8 this month</p>
+            <div className="text-2xl font-bold">{quotationStats.total}</div>
+            <p className="text-xs text-muted-foreground">+{quotationStats.thisMonthCount || 0} this month</p>
           </CardContent>
         </Card>
         <Card>
@@ -122,7 +259,7 @@ export function QuotationsContent() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
+            <div className="text-2xl font-bold">{quotationStats.pendingReview}</div>
             <p className="text-xs text-muted-foreground">Awaiting customer response</p>
           </CardContent>
         </Card>
@@ -132,8 +269,8 @@ export function QuotationsContent() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">72%</div>
-            <p className="text-xs text-muted-foreground">+5% from last quarter</p>
+            <div className="text-2xl font-bold">{quotationStats.acceptanceRate}%</div>
+            <p className="text-xs text-muted-foreground">Based on current data</p>
           </CardContent>
         </Card>
         <Card>
@@ -142,7 +279,7 @@ export function QuotationsContent() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹28,50,000</div>
+            <div className="text-2xl font-bold">₹{quotationStats.totalValue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">Active quotations</p>
           </CardContent>
         </Card>
@@ -185,7 +322,7 @@ export function QuotationsContent() {
       <Card>
         <CardHeader>
           <CardTitle>Quotations List</CardTitle>
-          <CardDescription>All quotations and their current status</CardDescription>
+          <CardDescription>Showing {filteredQuotations.length} of {quotationsList.length} quotations</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -205,9 +342,16 @@ export function QuotationsContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {quotations.map((quotation) => (
+                {filteredQuotations.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-8 text-gray-500">
+                      No quotations found. Click "Create Quotation" to create your first quotation.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredQuotations.map((quotation) => (
                   <TableRow key={quotation.id}>
-                    <TableCell className="font-medium">{quotation.id}</TableCell>
+                    <TableCell className="font-medium">{quotation.quotationId || quotation.id}</TableCell>
                     <TableCell>{quotation.date}</TableCell>
                     <TableCell className="font-medium">{quotation.accountName}</TableCell>
                     <TableCell>{quotation.contactName}</TableCell>
@@ -229,7 +373,12 @@ export function QuotationsContent() {
                         <Button variant="ghost" size="sm" title="View">
                           <Eye className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" title="Edit">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          title="Edit"
+                          onClick={() => handleEditQuotation(quotation)}
+                        >
                           <Edit className="w-4 h-4" />
                         </Button>
                         <Button variant="ghost" size="sm" title="Send">
@@ -241,12 +390,41 @@ export function QuotationsContent() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
+
+      {/* Add Quotation Modal */}
+      <AddQuotationModal
+        isOpen={isAddQuotationModalOpen}
+        onClose={() => setIsAddQuotationModalOpen(false)}
+        onSave={handleSaveQuotation}
+      />
+      
+      {/* Edit Quotation Modal */}
+      {editingQuotation && (
+        <AddQuotationModal
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false)
+            setEditingQuotation(null)
+          }}
+          onSave={handleUpdateQuotation}
+          editingQuotation={editingQuotation}
+        />
+      )}
+      
+      {/* DataImportModal component */}
+      <DataImportModal 
+        isOpen={isDataImportModalOpen} 
+        onClose={() => setIsDataImportModalOpen(false)}
+        moduleType="quotations"
+        onImport={(data) => console.log('Imported quotations:', data)}
+      />
     </div>
   )
 }

@@ -1,13 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Download, Eye, Edit, ShoppingCart, Truck } from "lucide-react"
+import { Plus, Search, Download, Eye, Edit, ShoppingCart, Truck, Upload } from "lucide-react"
+import { AddSalesOrderModal } from "@/components/add-sales-order-modal"
+import { DataImportModal } from "@/components/data-import-modal"
+import { useToast } from "@/hooks/use-toast"
+import storageService from "@/lib/localStorage-service"
 
 const salesOrders = [
   {
@@ -64,9 +68,109 @@ const statuses = ["All", "Draft", "Confirmed", "Processing", "Shipped", "Deliver
 const paymentStatuses = ["All", "Pending", "Advance Received", "Paid", "Overdue"]
 
 export function SalesOrdersContent() {
+  const { toast } = useToast()
+  const [salesOrdersList, setSalesOrdersList] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
+  const [salesOrdersStats, setSalesOrdersStats] = useState({
+    total: 0,
+    totalValue: 0,
+    pendingDelivery: 0,
+    avgValue: 0
+  })
   const [selectedStatus, setSelectedStatus] = useState("All")
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState("All")
+  const [isAddSalesOrderModalOpen, setIsAddSalesOrderModalOpen] = useState(false)
+  const [isDataImportModalOpen, setIsDataImportModalOpen] = useState(false)
+
+  // Load sales orders from localStorage on component mount
+  useEffect(() => {
+    loadSalesOrders()
+  }, [])
+
+  const loadSalesOrders = () => {
+    const storedOrders = storageService.getAll<any>('salesOrders')
+    console.log("loadSalesOrders - storedOrders:", storedOrders)
+    setSalesOrdersList(storedOrders)
+    
+    // Calculate stats
+    const stats = storageService.getStats('salesOrders')
+    const pendingDelivery = storedOrders.filter(order => 
+      order.status === 'Confirmed' || order.status === 'Processing' || order.status === 'Shipped'
+    ).length
+    
+    const totalValue = storedOrders.reduce((sum, order) => {
+      const value = parseFloat(order.amount?.replace(/[₹,]/g, '') || '0')
+      return sum + value
+    }, 0)
+    
+    const avgValue = storedOrders.length > 0 ? totalValue / storedOrders.length : 0
+    
+    setSalesOrdersStats({
+      total: stats.total,
+      totalValue: totalValue,
+      pendingDelivery: pendingDelivery,
+      avgValue: avgValue
+    })
+  }
+  
+  const handleSaveSalesOrder = (salesOrderData: any) => {
+    console.log("handleSaveSalesOrder called with:", salesOrderData)
+    
+    const newSalesOrder = storageService.create('salesOrders', salesOrderData)
+    console.log("New sales order created:", newSalesOrder)
+    
+    if (newSalesOrder) {
+      // Force immediate refresh from localStorage
+      const refreshedOrders = storageService.getAll<any>('salesOrders')
+      console.log("Force refresh - all sales orders:", refreshedOrders)
+      setSalesOrdersList(refreshedOrders)
+      
+      // Update stats
+      loadSalesOrders()
+      
+      toast({
+        title: "Sales order created",
+        description: `Sales order ${newSalesOrder.id || newSalesOrder.orderId} has been successfully created.`
+      })
+      setIsAddSalesOrderModalOpen(false)
+    } else {
+      console.error("Failed to create sales order")
+      toast({
+        title: "Error",
+        description: "Failed to create sales order",
+        variant: "destructive"
+      })
+    }
+  }
+  
+  const handleImportData = (importedOrders: any[]) => {
+    console.log('Imported sales orders:', importedOrders)
+    const createdOrders = storageService.createMany('salesOrders', importedOrders)
+    
+    // Immediately add imported orders to state
+    setSalesOrdersList(prevOrders => [...prevOrders, ...createdOrders])
+    
+    // Update stats
+    loadSalesOrders()
+    
+    toast({
+      title: "Data imported",
+      description: `Successfully imported ${createdOrders.length} sales orders.`
+    })
+  }
+  
+  // Filter orders based on search and filters
+  const filteredOrders = salesOrdersList.filter(order => {
+    const matchesSearch = searchTerm === "" || 
+      order.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.account?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.product?.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesStatus = selectedStatus === "All" || order.status === selectedStatus
+    const matchesPaymentStatus = selectedPaymentStatus === "All" || order.paymentStatus === selectedPaymentStatus
+
+    return matchesSearch && matchesStatus && matchesPaymentStatus
+  })
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -114,7 +218,11 @@ export function SalesOrdersContent() {
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
-          <Button>
+          <Button onClick={() => setIsDataImportModalOpen(true)} variant="outline">
+            <Upload className="w-4 h-4 mr-2" />
+            Import Orders
+          </Button>
+          <Button onClick={() => setIsAddSalesOrderModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
             <Plus className="w-4 h-4 mr-2" />
             Create Order
           </Button>
@@ -129,8 +237,8 @@ export function SalesOrdersContent() {
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">156</div>
-            <p className="text-xs text-muted-foreground">+12 this month</p>
+            <div className="text-2xl font-bold">{salesOrdersStats.total}</div>
+            <p className="text-xs text-muted-foreground">+{storageService.getStats('salesOrders').thisMonthCount} this month</p>
           </CardContent>
         </Card>
         <Card>
@@ -139,7 +247,7 @@ export function SalesOrdersContent() {
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹2.8Cr</div>
+            <div className="text-2xl font-bold">₹{(salesOrdersStats.totalValue / 10000000).toFixed(1)}Cr</div>
             <p className="text-xs text-muted-foreground">This quarter</p>
           </CardContent>
         </Card>
@@ -149,7 +257,7 @@ export function SalesOrdersContent() {
             <Truck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">23</div>
+            <div className="text-2xl font-bold">{salesOrdersStats.pendingDelivery}</div>
             <p className="text-xs text-muted-foreground">Need attention</p>
           </CardContent>
         </Card>
@@ -159,7 +267,7 @@ export function SalesOrdersContent() {
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹7,12,500</div>
+            <div className="text-2xl font-bold">₹{salesOrdersStats.avgValue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">Per order</p>
           </CardContent>
         </Card>
@@ -214,7 +322,7 @@ export function SalesOrdersContent() {
       <Card>
         <CardHeader>
           <CardTitle>Sales Orders List</CardTitle>
-          <CardDescription>All sales orders and their current status</CardDescription>
+          <CardDescription>Showing {filteredOrders.length} of {salesOrdersList.length} sales orders</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -234,7 +342,7 @@ export function SalesOrdersContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {salesOrders.map((order) => (
+                {filteredOrders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell className="font-medium">{order.id}</TableCell>
                     <TableCell>{order.date}</TableCell>
@@ -273,6 +381,21 @@ export function SalesOrdersContent() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Add Sales Order Modal */}
+      <AddSalesOrderModal
+        isOpen={isAddSalesOrderModalOpen}
+        onClose={() => setIsAddSalesOrderModalOpen(false)}
+        onSave={handleSaveSalesOrder}
+      />
+      
+      {/* DataImportModal component */}
+      <DataImportModal 
+        isOpen={isDataImportModalOpen} 
+        onClose={() => setIsDataImportModalOpen(false)}
+        moduleType="salesOrders"
+        onImport={handleImportData}
+      />
     </div>
   )
 }

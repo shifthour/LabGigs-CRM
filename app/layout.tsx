@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { DM_Sans } from "next/font/google"
 import "./globals.css"
+import { Toaster } from "@/components/ui/toaster"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -22,7 +23,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${dmSans.variable} ${dmSans.className}`}>{children}</body>
+      <body className={`${dmSans.variable} ${dmSans.className}`}>
+        {children}
+        <Toaster />
+      </body>
     </html>
   )
 }

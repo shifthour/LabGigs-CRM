@@ -1,13 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Receipt, IndianRupee, Clock, CheckCircle2, AlertCircle, Search, Filter, Plus, Eye, Edit, MoreHorizontal, Download, Send, Calendar, Building2, TrendingUp, TrendingDown, FileText } from "lucide-react"
+import { Receipt, IndianRupee, Clock, CheckCircle2, AlertCircle, Search, Filter, Plus, Eye, Edit, MoreHorizontal, Download, Send, Calendar, Building2, TrendingUp, TrendingDown, FileText, Upload, Printer } from "lucide-react"
+import { AddInvoiceModal } from "@/components/add-invoice-modal"
+import { DataImportModal } from "@/components/data-import-modal"
+import { useToast } from "@/hooks/use-toast"
+import storageService from "@/lib/localStorage-service"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,13 +22,226 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 export function InvoicesContent() {
+  const { toast } = useToast()
+  const [invoicesList, setInvoicesList] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
+  const [invoicesStatsState, setInvoicesStatsState] = useState({
+    total: 0,
+    outstanding: 0,
+    paidThisMonth: 0,
+    overdue: 0
+  })
   const [selectedTab, setSelectedTab] = useState("all")
+  const [isAddInvoiceModalOpen, setIsAddInvoiceModalOpen] = useState(false)
+  const [isDataImportModalOpen, setIsDataImportModalOpen] = useState(false)
+
+  // Load invoices from localStorage on component mount
+  useEffect(() => {
+    loadInvoices()
+  }, [])
+
+  const loadInvoices = () => {
+    let storedInvoices = storageService.getAll<any>('invoices')
+    console.log("loadInvoices - storedInvoices:", storedInvoices)
+    
+    // If no invoices in localStorage, initialize with sample data
+    if (storedInvoices.length === 0) {
+      console.log("No invoices found, initializing with sample data")
+      // Add sample invoices to localStorage
+      invoices.forEach(invoice => {
+        storageService.create('invoices', invoice)
+      })
+      storedInvoices = storageService.getAll<any>('invoices')
+      console.log("Initialized invoices:", storedInvoices)
+    }
+    
+    setInvoicesList(storedInvoices)
+    
+    // Calculate stats
+    const stats = storageService.getStats('invoices')
+    const outstanding = storedInvoices.filter(inv => inv.status === 'pending' || inv.status === 'sent').reduce((sum, inv) => {
+      const value = parseFloat(inv.amount?.replace(/[₹,]/g, '') || '0')
+      return sum + value
+    }, 0)
+    
+    const paidThisMonth = storedInvoices.filter(inv => {
+      const paidDate = new Date(inv.issueDate)
+      return inv.status === 'paid' && paidDate.getMonth() === new Date().getMonth()
+    }).reduce((sum, inv) => {
+      const value = parseFloat(inv.amount?.replace(/[₹,]/g, '') || '0')
+      return sum + value
+    }, 0)
+    
+    const overdue = storedInvoices.filter(inv => inv.status === 'overdue').length
+    
+    setInvoicesStatsState({
+      total: stats.total,
+      outstanding: outstanding,
+      paidThisMonth: paidThisMonth,
+      overdue: overdue
+    })
+  }
+  
+  const handleSaveInvoice = (invoiceData: any) => {
+    console.log("handleSaveInvoice called with:", invoiceData)
+    
+    const newInvoice = storageService.create('invoices', invoiceData)
+    console.log("New invoice created:", newInvoice)
+    
+    if (newInvoice) {
+      // Force immediate refresh from localStorage
+      const refreshedInvoices = storageService.getAll<any>('invoices')
+      console.log("Force refresh - all invoices:", refreshedInvoices)
+      setInvoicesList(refreshedInvoices)
+      
+      // Update stats
+      loadInvoices()
+      
+      toast({
+        title: "Invoice created",
+        description: `Invoice ${newInvoice.id || newInvoice.invoiceId} has been successfully created.`
+      })
+      setIsAddInvoiceModalOpen(false)
+    } else {
+      console.error("Failed to create invoice")
+      toast({
+        title: "Error",
+        description: "Failed to create invoice",
+        variant: "destructive"
+      })
+    }
+  }
+  
+  const handleImportData = (importedInvoices: any[]) => {
+    console.log('Imported invoices:', importedInvoices)
+    const createdInvoices = storageService.createMany('invoices', importedInvoices)
+    
+    // Immediately add imported invoices to state
+    setInvoicesList(prevInvoices => [...prevInvoices, ...createdInvoices])
+    
+    // Update stats
+    loadInvoices()
+    
+    toast({
+      title: "Data imported",
+      description: `Successfully imported ${createdInvoices.length} invoices.`
+    })
+  }
+  
+  // Invoice action handlers
+  const handlePrintInvoice = (invoice: any) => {
+    // Create a simple print view
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice ${invoice.id}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .details { margin-bottom: 20px; }
+          .table { width: 100%; border-collapse: collapse; }
+          .table th, .table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          .table th { background-color: #f2f2f2; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>INVOICE</h1>
+          <h2>${invoice.id}</h2>
+        </div>
+        <div class="details">
+          <p><strong>Customer:</strong> ${invoice.customer}</p>
+          <p><strong>Contact:</strong> ${invoice.contact}</p>
+          <p><strong>Amount:</strong> ${invoice.amount}</p>
+          <p><strong>Issue Date:</strong> ${invoice.issueDate}</p>
+          <p><strong>Due Date:</strong> ${invoice.dueDate}</p>
+          <p><strong>Status:</strong> ${invoice.status}</p>
+        </div>
+        <table class="table">
+          <tr><th>Items</th><th>Amount</th></tr>
+          <tr><td>${invoice.items}</td><td>${invoice.amount}</td></tr>
+        </table>
+      </body>
+      </html>
+    `
+    
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(printContent)
+      printWindow.document.close()
+      printWindow.print()
+    }
+    
+    toast({
+      title: "Invoice printed",
+      description: `Invoice ${invoice.id} has been sent to printer.`
+    })
+  }
+  
+  const handleSendInvoice = (invoice: any) => {
+    // Simulate sending email
+    const subject = `Invoice ${invoice.id} from Your Company`
+    const body = `Dear ${invoice.contact},\n\nPlease find attached your invoice ${invoice.id} for ${invoice.amount}.\n\nDue Date: ${invoice.dueDate}\n\nThank you for your business!\n\nBest regards,\nAccounts Team`
+    
+    // In a real application, you would integrate with an email service
+    // For now, we'll open the default email client
+    window.open(`mailto:${invoice.contact}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_self')
+    
+    toast({
+      title: "Invoice sent",
+      description: `Invoice ${invoice.id} has been sent to ${invoice.customer}.`
+    })
+  }
+  
+  const handleDownloadPDF = (invoice: any) => {
+    // In a real application, you would generate and download a PDF
+    // For now, we'll simulate the download
+    const invoiceData = JSON.stringify(invoice, null, 2)
+    const blob = new Blob([invoiceData], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `invoice_${invoice.id}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    
+    toast({
+      title: "Invoice downloaded",
+      description: `Invoice ${invoice.id} has been downloaded.`
+    })
+  }
+  
+  const handleMarkAsPaid = (invoice: any) => {
+    const updatedInvoice = storageService.update('invoices', invoice.id, {
+      ...invoice,
+      status: 'paid',
+      paymentMethod: 'Marked Manually'
+    })
+    
+    if (updatedInvoice) {
+      // Refresh the invoices list
+      loadInvoices()
+      
+      toast({
+        title: "Invoice marked as paid",
+        description: `Invoice ${invoice.id} has been marked as paid.`
+      })
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to update invoice status",
+        variant: "destructive"
+      })
+    }
+  }
 
   const invoicesStats = [
     {
       title: "Total Invoices",
-      value: "247",
+      value: invoicesStatsState.total.toString(),
       change: "+12.5%",
       icon: FileText,
       color: "text-blue-600",
@@ -33,7 +250,7 @@ export function InvoicesContent() {
     },
     {
       title: "Outstanding Amount",
-      value: "₹12.5L",
+      value: `₹${(invoicesStatsState.outstanding / 100000).toFixed(1)}L`,
       change: "-8.2%", 
       icon: IndianRupee,
       color: "text-red-600",
@@ -42,7 +259,7 @@ export function InvoicesContent() {
     },
     {
       title: "Paid This Month",
-      value: "₹45.2L",
+      value: `₹${(invoicesStatsState.paidThisMonth / 100000).toFixed(1)}L`,
       change: "+15.3%",
       icon: CheckCircle2,
       color: "text-green-600",
@@ -51,7 +268,7 @@ export function InvoicesContent() {
     },
     {
       title: "Overdue",
-      value: "23",
+      value: invoicesStatsState.overdue.toString(),
       change: "+5.1%",
       icon: AlertCircle,
       color: "text-orange-600",
@@ -147,7 +364,7 @@ export function InvoicesContent() {
     return variants[status as keyof typeof variants] || "bg-gray-100 text-gray-800"
   }
 
-  const filteredInvoices = invoices.filter(invoice => {
+  const filteredInvoices = invoicesList.filter(invoice => {
     const matchesSearch = invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          invoice.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          invoice.contact.toLowerCase().includes(searchTerm.toLowerCase())
@@ -181,7 +398,11 @@ export function InvoicesContent() {
             <Filter className="w-4 h-4 mr-2" />
             Filter
           </Button>
-          <Button className="bg-blue-600 hover:bg-blue-700" size="sm">
+          <Button onClick={() => setIsDataImportModalOpen(true)} variant="outline" size="sm">
+            <Upload className="w-4 h-4 mr-2" />
+            Import Invoices
+          </Button>
+          <Button onClick={() => setIsAddInvoiceModalOpen(true)} className="bg-blue-600 hover:bg-blue-700" size="sm">
             <Plus className="w-4 h-4 mr-2" />
             Create Invoice
           </Button>
@@ -240,24 +461,71 @@ export function InvoicesContent() {
           </TabsList>
 
           <TabsContent value="all" className="space-y-4">
-            <InvoicesTable invoices={filteredInvoices} />
+            <InvoicesTable 
+              invoices={filteredInvoices} 
+              onPrint={handlePrintInvoice}
+              onSend={handleSendInvoice} 
+              onDownload={handleDownloadPDF}
+              onMarkAsPaid={handleMarkAsPaid}
+            />
           </TabsContent>
           <TabsContent value="pending" className="space-y-4">
-            <InvoicesTable invoices={filteredInvoices} />
+            <InvoicesTable 
+              invoices={filteredInvoices} 
+              onPrint={handlePrintInvoice}
+              onSend={handleSendInvoice} 
+              onDownload={handleDownloadPDF}
+              onMarkAsPaid={handleMarkAsPaid}
+            />
           </TabsContent>
           <TabsContent value="overdue" className="space-y-4">
-            <InvoicesTable invoices={filteredInvoices} />
+            <InvoicesTable 
+              invoices={filteredInvoices} 
+              onPrint={handlePrintInvoice}
+              onSend={handleSendInvoice} 
+              onDownload={handleDownloadPDF}
+              onMarkAsPaid={handleMarkAsPaid}
+            />
           </TabsContent>
           <TabsContent value="paid" className="space-y-4">
-            <InvoicesTable invoices={filteredInvoices} />
+            <InvoicesTable 
+              invoices={filteredInvoices} 
+              onPrint={handlePrintInvoice}
+              onSend={handleSendInvoice} 
+              onDownload={handleDownloadPDF}
+              onMarkAsPaid={handleMarkAsPaid}
+            />
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Add Invoice Modal */}
+      <AddInvoiceModal
+        isOpen={isAddInvoiceModalOpen}
+        onClose={() => setIsAddInvoiceModalOpen(false)}
+        onSave={handleSaveInvoice}
+      />
+      
+      {/* DataImportModal component */}
+      <DataImportModal 
+        isOpen={isDataImportModalOpen} 
+        onClose={() => setIsDataImportModalOpen(false)}
+        moduleType="invoices"
+        onImport={handleImportData}
+      />
     </div>
   )
 }
 
-function InvoicesTable({ invoices }: { invoices: any[] }) {
+interface InvoicesTableProps {
+  invoices: any[]
+  onPrint: (invoice: any) => void
+  onSend: (invoice: any) => void
+  onDownload: (invoice: any) => void
+  onMarkAsPaid: (invoice: any) => void
+}
+
+function InvoicesTable({ invoices, onPrint, onSend, onDownload, onMarkAsPaid }: InvoicesTableProps) {
   const getStatusBadge = (status: string) => {
     const variants = {
       paid: "bg-green-100 text-green-800",
@@ -356,24 +624,32 @@ function InvoicesTable({ invoices }: { invoices: any[] }) {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          console.log(`Viewing invoice ${invoice.id}`)
+                        }}>
                           <Eye className="mr-2 h-4 w-4" />
                           View Invoice
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          console.log(`Editing invoice ${invoice.id}`)
+                        }}>
                           <Edit className="mr-2 h-4 w-4" />
                           Edit Invoice
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onDownload(invoice)}>
                           <Download className="mr-2 h-4 w-4" />
                           Download PDF
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onPrint(invoice)}>
+                          <Printer className="mr-2 h-4 w-4" />
+                          Print Invoice
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onSend(invoice)}>
                           <Send className="mr-2 h-4 w-4" />
                           Send to Customer
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onMarkAsPaid(invoice)}>
                           <CheckCircle2 className="mr-2 h-4 w-4" />
                           Mark as Paid
                         </DropdownMenuItem>

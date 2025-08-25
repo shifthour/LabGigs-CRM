@@ -1,15 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Download, Eye, Edit, Package } from "lucide-react"
+import { Plus, Search, Download, Eye, Edit, Package, Upload } from "lucide-react"
 import { AIProductRecommendations } from "@/components/ai-product-recommendations"
 import { AddProductModal } from "@/components/add-product-modal"
+import { DataImportModal } from "@/components/data-import-modal"
+import { useToast } from "@/hooks/use-toast"
+import storageService from "@/lib/localStorage-service"
 
 const products = [
   {
@@ -89,11 +92,95 @@ const principals = [
 const statuses = ["All", "Active", "Inactive", "Discontinued"]
 
 export function ProductsContent() {
+  const { toast } = useToast()
+  const [productsList, setProductsList] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
+  const [productsStats, setProductsStats] = useState({
+    total: 0,
+    active: 0,
+    categories: 0,
+    avgValue: 0
+  })
   const [selectedBranch, setSelectedBranch] = useState("All")
   const [selectedPrincipal, setSelectedPrincipal] = useState("All")
   const [selectedStatus, setSelectedStatus] = useState("All")
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false)
+  const [isDataImportModalOpen, setIsDataImportModalOpen] = useState(false)
+
+  // Load products from localStorage on component mount
+  useEffect(() => {
+    loadProducts()
+  }, [])
+
+  const loadProducts = () => {
+    const storedProducts = storageService.getAll<any>('products')
+    console.log("loadProducts - storedProducts:", storedProducts)
+    setProductsList(storedProducts)
+    
+    // Calculate stats
+    const stats = storageService.getStats('products')
+    const activeProducts = storedProducts.filter(product => product.status === 'Active').length
+    const categories = [...new Set(storedProducts.map(product => product.category))].length
+    const avgValue = storedProducts.length > 0 
+      ? storedProducts.reduce((sum, product) => {
+          const value = parseFloat(product.price?.replace(/[₹,]/g, '') || '0')
+          return sum + value
+        }, 0) / storedProducts.length 
+      : 0
+    
+    setProductsStats({
+      total: stats.total,
+      active: activeProducts,
+      categories: categories,
+      avgValue: avgValue
+    })
+  }
+  
+  const handleSaveProduct = (productData: any) => {
+    console.log("handleSaveProduct called with:", productData)
+    
+    const newProduct = storageService.create('products', productData)
+    console.log("New product created:", newProduct)
+    
+    if (newProduct) {
+      // Force immediate refresh from localStorage
+      const refreshedProducts = storageService.getAll<any>('products')
+      console.log("Force refresh - all products:", refreshedProducts)
+      setProductsList(refreshedProducts)
+      
+      // Update stats
+      loadProducts()
+      
+      toast({
+        title: "Product created",
+        description: `Product ${newProduct.productName || newProduct.id} has been successfully created.`
+      })
+      setIsAddProductModalOpen(false)
+    } else {
+      console.error("Failed to create product")
+      toast({
+        title: "Error",
+        description: "Failed to create product",
+        variant: "destructive"
+      })
+    }
+  }
+  
+  const handleImportData = (importedProducts: any[]) => {
+    console.log('Imported products:', importedProducts)
+    const createdProducts = storageService.createMany('products', importedProducts)
+    
+    // Immediately add imported products to state
+    setProductsList(prevProducts => [...prevProducts, ...createdProducts])
+    
+    // Update stats
+    loadProducts()
+    
+    toast({
+      title: "Data imported",
+      description: `Successfully imported ${createdProducts.length} products.`
+    })
+  }
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -108,6 +195,26 @@ export function ProductsContent() {
     }
   }
 
+  // Filter products based on search and filters
+  const filteredProducts = productsList.filter(product => {
+    const matchesSearch = searchTerm === "" || 
+      product.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.refNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.principal.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesBranch = selectedBranch === "All" || 
+      product.branch.toLowerCase().includes(selectedBranch.toLowerCase())
+
+    const matchesPrincipal = selectedPrincipal === "All" || 
+      product.principal === selectedPrincipal
+
+    const matchesStatus = selectedStatus === "All" || 
+      product.status === selectedStatus
+
+    return matchesSearch && matchesBranch && matchesPrincipal && matchesStatus
+  })
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -120,7 +227,11 @@ export function ProductsContent() {
             <Download className="w-4 h-4 mr-2" />
             Export Catalog
           </Button>
-          <Button onClick={() => setIsAddProductModalOpen(true)}>
+          <Button onClick={() => setIsDataImportModalOpen(true)} variant="outline">
+            <Upload className="w-4 h-4 mr-2" />
+            Import Products
+          </Button>
+          <Button onClick={() => setIsAddProductModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
             <Plus className="w-4 h-4 mr-2" />
             Add Product
           </Button>
@@ -135,8 +246,8 @@ export function ProductsContent() {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">2,077</div>
-            <p className="text-xs text-muted-foreground">+23 this month</p>
+            <div className="text-2xl font-bold">{productsStats.total}</div>
+            <p className="text-xs text-muted-foreground">+{storageService.getStats('products').thisMonthCount} this month</p>
           </CardContent>
         </Card>
         <Card>
@@ -145,8 +256,8 @@ export function ProductsContent() {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,945</div>
-            <p className="text-xs text-muted-foreground">94% of catalog</p>
+            <div className="text-2xl font-bold">{productsStats.active}</div>
+            <p className="text-xs text-muted-foreground">{productsStats.total > 0 ? Math.round((productsStats.active / productsStats.total) * 100) : 0}% of catalog</p>
           </CardContent>
         </Card>
         <Card>
@@ -155,7 +266,7 @@ export function ProductsContent() {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">45</div>
+            <div className="text-2xl font-bold">{productsStats.categories}</div>
             <p className="text-xs text-muted-foreground">Well organized</p>
           </CardContent>
         </Card>
@@ -165,7 +276,7 @@ export function ProductsContent() {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹8,96,000</div>
+            <div className="text-2xl font-bold">₹{productsStats.avgValue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">Laboratory equipment</p>
           </CardContent>
         </Card>
@@ -232,7 +343,7 @@ export function ProductsContent() {
       <Card>
         <CardHeader>
           <CardTitle>Products List</CardTitle>
-          <CardDescription>1-25 of 2077 products</CardDescription>
+          <CardDescription>Showing {filteredProducts.length} of {productsList.length} products</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -251,7 +362,7 @@ export function ProductsContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products.map((product) => (
+                {filteredProducts.map((product) => (
                   <TableRow key={product.id}>
                     <TableCell>{product.branch}</TableCell>
                     <TableCell>{product.category}</TableCell>
@@ -297,7 +408,15 @@ export function ProductsContent() {
       />
 
       {/* AddProductModal component */}
-      <AddProductModal isOpen={isAddProductModalOpen} onClose={() => setIsAddProductModalOpen(false)} />
+      <AddProductModal isOpen={isAddProductModalOpen} onClose={() => setIsAddProductModalOpen(false)} onSave={handleSaveProduct} />
+      
+      {/* DataImportModal component */}
+      <DataImportModal 
+        isOpen={isDataImportModalOpen} 
+        onClose={() => setIsDataImportModalOpen(false)}
+        moduleType="products"
+        onImport={handleImportData}
+      />
     </div>
   )
 }

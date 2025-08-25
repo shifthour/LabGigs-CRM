@@ -312,13 +312,17 @@ export function AddAccountModal({ isOpen, onClose }: AddAccountModalProps) {
                       <SelectValue placeholder="Select industry" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="biotechnology">Biotechnology</SelectItem>
-                      <SelectItem value="manufacturing">Manufacturing</SelectItem>
-                      <SelectItem value="healthcare">Healthcare</SelectItem>
-                      <SelectItem value="it">Information Technology</SelectItem>
-                      <SelectItem value="finance">Finance</SelectItem>
-                      <SelectItem value="education">Education</SelectItem>
-                      <SelectItem value="retail">Retail</SelectItem>
+                      <SelectItem value="biotech-company">Biotech Company</SelectItem>
+                      <SelectItem value="dealer">Dealer</SelectItem>
+                      <SelectItem value="educational-institutions">Educational Institutions</SelectItem>
+                      <SelectItem value="food-beverages">Food and Beverages</SelectItem>
+                      <SelectItem value="hair-transplant-hospitals">Hair Transplant Clinics/ Hospitals</SelectItem>
+                      <SelectItem value="molecular-diagnostics">Molecular Diagnostics</SelectItem>
+                      <SelectItem value="pharmaceutical">Pharmaceutical</SelectItem>
+                      <SelectItem value="research">Research</SelectItem>
+                      <SelectItem value="sro">SRO</SelectItem>
+                      <SelectItem value="training-institute">Training Institute</SelectItem>
+                      <SelectItem value="universities">Universities</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

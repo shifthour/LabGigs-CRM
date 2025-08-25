@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { EnhancedCard } from "@/components/ui/enhanced-card"
 import { StatusIndicator } from "@/components/ui/status-indicator"
-import { Users, Package, AlertTriangle, Calendar, Coins, Target, Plus, ArrowRight, Bell, Brain, Sparkles, Building2 } from "lucide-react"
+import { Users, Package, AlertTriangle, Calendar, Coins, Target, Plus, ArrowRight, Bell, Brain, Sparkles, Building2, Handshake } from "lucide-react"
 import { SalesChart } from "@/components/sales-chart"
 import { ComplaintsChart } from "@/components/complaints-chart"
 import { Badge } from "@/components/ui/badge"
@@ -26,6 +26,13 @@ const stats = [
     value: "298",
     change: { value: "+8.2%", type: "positive" as const, period: "from last month" },
     icon: Users,
+    trend: "up" as const,
+  },
+  {
+    title: "Deals",
+    value: "156",
+    change: { value: "+18.7%", type: "positive" as const, period: "from last month" },
+    icon: Handshake,
     trend: "up" as const,
   },
   {
@@ -141,17 +148,25 @@ export function DashboardContent() {
               </div>
             </div>
             
-            <div className="flex items-center space-x-3">
-              {/* Smart Notifications */}
+            <div className="flex items-center space-x-3">              
+              {/* AI Status Indicator with Notifications */}
               <div className="relative">
                 <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 hover:bg-white/20 transition-colors cursor-pointer">
-                  <Bell className="h-6 w-6" />
+                  <Brain className="h-6 w-6" />
                   <Badge className="absolute -top-2 -right-2 bg-red-500 text-white min-w-[20px] h-5 flex items-center justify-center text-xs">
                     3
                   </Badge>
+                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
                 </div>
-                {/* Smart notification preview */}
+                {/* AI Smart notification preview */}
                 <div className="absolute right-0 top-full mt-2 w-80 bg-white text-gray-900 rounded-lg shadow-lg border opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
+                  <div className="p-3 border-b bg-gradient-to-r from-purple-50 to-blue-50">
+                    <div className="flex items-center space-x-2">
+                      <Brain className="w-4 h-4 text-purple-600" />
+                      <span className="font-semibold text-sm">🤖 AI Insights</span>
+                      <Badge className="text-xs bg-purple-100 text-purple-800">Live</Badge>
+                    </div>
+                  </div>
                   <div className="p-3">
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2 text-sm">
@@ -173,12 +188,6 @@ export function DashboardContent() {
                   </div>
                 </div>
               </div>
-              
-              {/* AI Status Indicator */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
-                <Brain className="h-6 w-6" />
-                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
-              </div>
             </div>
           </div>
         </div>
@@ -187,7 +196,7 @@ export function DashboardContent() {
       </div>
 
       {/* Enhanced Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {stats.map((stat) => (
           <EnhancedCard
             key={stat.title}

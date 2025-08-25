@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,22 +14,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   Plus,
   Search,
-  MoreHorizontal,
   Edit,
-  Eye,
   TrendingUp,
   Calendar,
   IndianRupee,
   Target,
+  Handshake,
   Brain,
   Zap,
   Download,
+  Upload,
 } from "lucide-react"
 import { AIPredictiveAnalytics } from "@/components/ai-predictive-analytics"
 import { AIInsightsPanel } from "@/components/ai-insights-panel"
 import { AIEmailGenerator } from "@/components/ai-email-generator"
 import { AIProductRecommendations } from "@/components/ai-product-recommendations"
+import { DataImportModal } from "@/components/data-import-modal"
 import { AIInsightsService, type OpportunityData, type AIInsight } from "@/lib/ai-services"
+import { useToast } from "@/hooks/use-toast"
+import storageService from "@/lib/localStorage-service"
 
 interface Opportunity {
   id: string
@@ -126,13 +129,73 @@ const mockOpportunities: Opportunity[] = [
 ]
 
 export function OpportunitiesContent() {
-  const [opportunities, setOpportunities] = useState<Opportunity[]>(mockOpportunities)
+  const { toast } = useToast()
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([])
+  const [opportunitiesStats, setOpportunitiesStats] = useState({
+    total: 0,
+    thisMonth: 0,
+    totalValue: 0,
+    weightedValue: 0
+  })
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedStage, setSelectedStage] = useState("all")
   const [selectedPriority, setSelectedPriority] = useState("all")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null)
   const [activeTab, setActiveTab] = useState("list")
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+
+  // Load opportunities from localStorage on component mount
+  useEffect(() => {
+    loadOpportunities()
+  }, [])
+
+  const loadOpportunities = () => {
+    const storedOpportunities = storageService.getAll<Opportunity>('opportunities')
+    console.log("loadOpportunities - storedOpportunities:", storedOpportunities)
+    setOpportunities(storedOpportunities)
+    
+    // Calculate stats
+    const stats = storageService.getStats('opportunities')
+    const thisMonth = storedOpportunities.filter(opp => 
+      new Date(opp.expectedCloseDate).getMonth() === new Date().getMonth()
+    ).length
+    
+    const totalValue = storedOpportunities.reduce((sum, opp) => 
+      sum + Number.parseFloat(opp.value.replace(/[₹,]/g, "")), 0
+    )
+    
+    const weightedValue = storedOpportunities.reduce(
+      (sum, opp) =>
+        sum +
+        Number.parseFloat(opp.value.replace(/[₹,]/g, "")) * (Number.parseFloat(opp.probability.replace("%", "")) / 100),
+      0,
+    )
+    
+    setOpportunitiesStats({
+      total: stats.total,
+      thisMonth: thisMonth,
+      totalValue: totalValue,
+      weightedValue: weightedValue
+    })
+  }
+
+  const handleImportData = (importedOpportunities: any[]) => {
+    console.log('Imported opportunities:', importedOpportunities)
+    const createdOpportunities = storageService.createMany('opportunities', importedOpportunities)
+    
+    // Immediately add imported opportunities to state
+    setOpportunities(prevOpportunities => [...prevOpportunities, ...createdOpportunities])
+    
+    // Update stats
+    loadOpportunities()
+    
+    toast({
+      title: "Data imported",
+      description: `Successfully imported ${createdOpportunities.length} opportunities.`
+    })
+  }
 
   // Convert opportunities to the format expected by AI services
   const opportunityData: OpportunityData[] = useMemo(
@@ -199,31 +262,84 @@ export function OpportunitiesContent() {
     }
   }
 
-  const totalValue = opportunities.reduce((sum, opp) => sum + Number.parseFloat(opp.value.replace(/[₹,]/g, "")), 0)
-
-  const weightedValue = opportunities.reduce(
-    (sum, opp) =>
-      sum +
-      Number.parseFloat(opp.value.replace(/[₹,]/g, "")) * (Number.parseFloat(opp.probability.replace("%", "")) / 100),
-    0,
-  )
+  const handleSaveOpportunity = (opportunityData: any) => {
+    console.log("handleSaveOpportunity called with:", opportunityData)
+    
+    const newOpportunity = storageService.create('opportunities', opportunityData)
+    console.log("New opportunity created:", newOpportunity)
+    
+    if (newOpportunity) {
+      // Force immediate refresh from localStorage
+      const refreshedOpportunities = storageService.getAll<Opportunity>('opportunities')
+      console.log("Force refresh - all opportunities:", refreshedOpportunities)
+      setOpportunities(refreshedOpportunities)
+      
+      // Update stats
+      loadOpportunities()
+      
+      toast({
+        title: "Opportunity created",
+        description: `Opportunity ${newOpportunity.accountName || newOpportunity.id} has been successfully created.`
+      })
+      setIsAddDialogOpen(false)
+    } else {
+      console.error("Failed to create opportunity")
+      toast({
+        title: "Error",
+        description: "Failed to create opportunity",
+        variant: "destructive"
+      })
+    }
+  }
+  
+  const handleUpdateOpportunity = (updatedOpportunity: any) => {
+    console.log('Updating opportunity:', updatedOpportunity)
+    
+    const updated = storageService.update('opportunities', selectedOpportunity?.id, updatedOpportunity)
+    if (updated) {
+      setOpportunities(prevOpportunities => 
+        prevOpportunities.map(opp => opp.id === selectedOpportunity?.id ? updated : opp)
+      )
+      
+      // Update stats
+      loadOpportunities()
+      
+      toast({
+        title: "Opportunity updated",
+        description: `Opportunity ${updated.accountName || updated.id} has been successfully updated.`
+      })
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to update opportunity",
+        variant: "destructive"
+      })
+    }
+    
+    setIsEditDialogOpen(false)
+    setSelectedOpportunity(null)
+  }
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Opportunities</h1>
-          <p className="text-gray-600 mt-1">Manage and track your sales opportunities</p>
+          <h1 className="text-3xl font-bold text-gray-900">Deals</h1>
+          <p className="text-gray-600 mt-1">Manage and track your sales deals</p>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline">
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
+          <Button variant="outline" onClick={() => setIsImportModalOpen(true)}>
+            <Upload className="w-4 h-4 mr-2" />
+            Import Data
+          </Button>
           <Button onClick={() => setIsAddDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
             <Plus className="w-4 h-4 mr-2" />
-            Add Opportunity
+            Add Deal
           </Button>
         </div>
       </div>
@@ -234,11 +350,11 @@ export function OpportunitiesContent() {
           <CardContent className="p-6">
             <div className="flex items-center">
               <div className="p-2 rounded-lg bg-blue-100 mr-4">
-                <Target className="w-6 h-6 text-blue-600" />
+                <Handshake className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Opportunities</p>
-                <p className="text-2xl font-bold">{opportunities.length}</p>
+                <p className="text-sm font-medium text-gray-600">Total Deals</p>
+                <p className="text-2xl font-bold">{opportunitiesStats.total}</p>
               </div>
             </div>
           </CardContent>
@@ -252,7 +368,7 @@ export function OpportunitiesContent() {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-600">Pipeline Value</p>
-                <p className="text-2xl font-bold">₹{(totalValue / 100000).toFixed(1)}L</p>
+                <p className="text-2xl font-bold">₹{(opportunitiesStats.totalValue / 100000).toFixed(1)}L</p>
               </div>
             </div>
           </CardContent>
@@ -266,7 +382,7 @@ export function OpportunitiesContent() {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-600">Weighted Pipeline</p>
-                <p className="text-2xl font-bold">₹{(weightedValue / 100000).toFixed(1)}L</p>
+                <p className="text-2xl font-bold">₹{(opportunitiesStats.weightedValue / 100000).toFixed(1)}L</p>
               </div>
             </div>
           </CardContent>
@@ -280,12 +396,7 @@ export function OpportunitiesContent() {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-600">This Month</p>
-                <p className="text-2xl font-bold">
-                  {
-                    opportunities.filter((opp) => new Date(opp.expectedCloseDate).getMonth() === new Date().getMonth())
-                      .length
-                  }
-                </p>
+                <p className="text-2xl font-bold">{opportunitiesStats.thisMonth}</p>
               </div>
             </div>
           </CardContent>
@@ -404,14 +515,16 @@ export function OpportunitiesContent() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
-                            <Button variant="ghost" size="sm">
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => {
+                                setSelectedOpportunity(opportunity)
+                                setIsEditDialogOpen(true)
+                              }}
+                              title="Edit Opportunity"
+                            >
                               <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="w-4 h-4" />
                             </Button>
                           </div>
                         </TableCell>
@@ -440,12 +553,12 @@ export function OpportunitiesContent() {
         </TabsContent>
       </Tabs>
 
-      {/* Add Opportunity Dialog */}
+      {/* Add Deal Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Add New Opportunity</DialogTitle>
-            <DialogDescription>Create a new sales opportunity to track in your pipeline.</DialogDescription>
+            <DialogTitle>Add New Deal</DialogTitle>
+            <DialogDescription>Create a new sales deal to track in your pipeline.</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-4">
             <div className="space-y-2">
@@ -508,10 +621,124 @@ export function OpportunitiesContent() {
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={() => setIsAddDialogOpen(false)}>Create Opportunity</Button>
+            <Button onClick={() => {
+              // Collect form data and create opportunity
+              const formData = {
+                id: `OPP-${Date.now()}`,
+                accountName: (document.getElementById('accountName') as HTMLInputElement)?.value || '',
+                contactPerson: (document.getElementById('contactPerson') as HTMLInputElement)?.value || '',
+                product: (document.getElementById('product') as HTMLInputElement)?.value || '',
+                value: (document.getElementById('value') as HTMLInputElement)?.value || '',
+                stage: 'Qualification',
+                probability: (document.getElementById('probability') as HTMLInputElement)?.value || '25%',
+                expectedCloseDate: (document.getElementById('closeDate') as HTMLInputElement)?.value || '',
+                lastActivity: 'Created',
+                source: 'Manual Entry',
+                assignedTo: 'Admin',
+                priority: 'Medium',
+                status: 'Active'
+              }
+              handleSaveOpportunity(formData)
+            }}>Create Deal</Button>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Deal Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Deal</DialogTitle>
+            <DialogDescription>Update the sales deal information.</DialogDescription>
+          </DialogHeader>
+          {selectedOpportunity && (
+            <div className="grid grid-cols-2 gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-accountName">Account Name</Label>
+                <Input id="edit-accountName" defaultValue={selectedOpportunity.accountName} placeholder="Enter account name" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-contactPerson">Contact Person</Label>
+                <Input id="edit-contactPerson" defaultValue={selectedOpportunity.contactPerson} placeholder="Enter contact person" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-product">Product</Label>
+                <Input id="edit-product" defaultValue={selectedOpportunity.product} placeholder="Enter product" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-value">Value</Label>
+                <Input id="edit-value" defaultValue={selectedOpportunity.value} placeholder="Enter value" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-stage">Stage</Label>
+                <Select defaultValue={selectedOpportunity.stage}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select stage" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Qualification">Qualification</SelectItem>
+                    <SelectItem value="Demo">Demo</SelectItem>
+                    <SelectItem value="Proposal">Proposal</SelectItem>
+                    <SelectItem value="Negotiation">Negotiation</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-probability">Probability</Label>
+                <Input id="edit-probability" defaultValue={selectedOpportunity.probability} placeholder="Enter probability %" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-closeDate">Expected Close Date</Label>
+                <Input id="edit-closeDate" type="date" defaultValue={selectedOpportunity.expectedCloseDate} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-priority">Priority</Label>
+                <Select defaultValue={selectedOpportunity.priority}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="High">High</SelectItem>
+                    <SelectItem value="Medium">Medium</SelectItem>
+                    <SelectItem value="Low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="edit-notes">Notes</Label>
+                <Textarea id="edit-notes" placeholder="Enter any additional notes" />
+              </div>
+            </div>
+          )}
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              if (selectedOpportunity) {
+                const formData = {
+                  ...selectedOpportunity,
+                  accountName: (document.getElementById('edit-accountName') as HTMLInputElement)?.value || selectedOpportunity.accountName,
+                  contactPerson: (document.getElementById('edit-contactPerson') as HTMLInputElement)?.value || selectedOpportunity.contactPerson,
+                  product: (document.getElementById('edit-product') as HTMLInputElement)?.value || selectedOpportunity.product,
+                  value: (document.getElementById('edit-value') as HTMLInputElement)?.value || selectedOpportunity.value,
+                  probability: (document.getElementById('edit-probability') as HTMLInputElement)?.value || selectedOpportunity.probability,
+                  expectedCloseDate: (document.getElementById('edit-closeDate') as HTMLInputElement)?.value || selectedOpportunity.expectedCloseDate,
+                }
+                handleUpdateOpportunity(formData)
+              }
+            }}>Update Deal</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Modal */}
+      <DataImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        moduleType="opportunities"
+        onImport={handleImportData}
+      />
     </div>
   )
 }
