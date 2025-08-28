@@ -76,27 +76,76 @@ export function AccountsContent() {
     employees: ""
   })
 
-  // Load accounts from localStorage on component mount
+  // Load accounts from Supabase API
   useEffect(() => {
-    loadAccounts()
+    loadAccountsFromAPI()
   }, [])
 
-  const loadAccounts = () => {
-    const storedAccounts = storageService.getAll<Account>('accounts')
-    console.log("loadAccounts - storedAccounts:", storedAccounts)
-    setAccounts(storedAccounts)
-    
-    // Calculate stats
-    const stats = storageService.getStats('accounts')
-    const activeAccounts = storedAccounts.filter(acc => acc.status === 'Active').length
-    const uniqueRegions = [...new Set(storedAccounts.filter(acc => acc.region).map(acc => acc.region))].length
-    
-    setAccountStats({
-      total: stats.total,
-      active: activeAccounts,
-      newThisMonth: stats.thisMonthCount,
-      activeRegions: uniqueRegions
-    })
+  const loadAccountsFromAPI = async () => {
+    try {
+      // Get current user to find company ID
+      const storedUser = localStorage.getItem('user')
+      if (!storedUser) {
+        console.log("No user found in localStorage")
+        return
+      }
+      
+      const user = JSON.parse(storedUser)
+      if (!user.company_id) {
+        console.log("No company_id found for user")
+        return
+      }
+      
+      console.log("Loading accounts for company:", user.company_id)
+      
+      // Fetch accounts from API
+      const response = await fetch(`/api/accounts?companyId=${user.company_id}&limit=100`)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch accounts: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log("API Response:", data)
+      
+      // Map API data to component format
+      const mappedAccounts = (data.accounts || []).map((account: any) => ({
+        id: account.id,
+        accountName: account.account_name,
+        city: account.billing_city,
+        state: account.billing_state,
+        region: account.billing_state, // Use state as region for now
+        contactName: account.owner?.full_name,
+        contactNo: account.phone,
+        email: account.owner?.email,
+        website: account.website,
+        assignedTo: account.owner?.full_name,
+        industry: account.industry,
+        status: account.status || 'Active',
+        createdAt: account.created_at
+      }))
+      
+      console.log("Mapped accounts:", mappedAccounts)
+      setAccounts(mappedAccounts)
+      
+      // Calculate stats from API data
+      const activeAccounts = mappedAccounts.filter((acc: any) => acc.status === 'Active').length
+      const uniqueRegions = [...new Set(mappedAccounts.filter((acc: any) => acc.region).map((acc: any) => acc.region))].length
+      
+      setAccountStats({
+        total: data.total || mappedAccounts.length,
+        active: activeAccounts,
+        newThisMonth: 0, // TODO: Calculate from created dates
+        activeRegions: uniqueRegions
+      })
+      
+    } catch (error) {
+      console.error("Error loading accounts:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load accounts from database",
+        variant: "destructive"
+      })
+    }
   }
 
   // Debug: Log current accounts state
@@ -261,29 +310,91 @@ export function AccountsContent() {
     })
   }
 
-  const handleImportData = (data: any[]) => {
-    const importedAccounts = storageService.createMany('accounts', data)
-    
-    // Immediately add imported accounts to state
-    setAccounts(prevAccounts => [...prevAccounts, ...importedAccounts])
-    
-    // Update stats
-    const stats = storageService.getStats('accounts')
-    const storedAccounts = storageService.getAll<Account>('accounts')
-    const activeAccounts = storedAccounts.filter(acc => acc.status === 'Active').length
-    const uniqueRegions = [...new Set(storedAccounts.filter(acc => acc.region).map(acc => acc.region))].length
-    
-    setAccountStats({
-      total: stats.total,
-      active: activeAccounts,
-      newThisMonth: stats.thisMonthCount,
-      activeRegions: uniqueRegions
-    })
-    
-    toast({
-      title: "Data imported",
-      description: `Successfully imported ${importedAccounts.length} accounts.`
-    })
+  const handleImportData = async (data: any[]) => {
+    try {
+      // Get current user's company ID
+      const storedUser = localStorage.getItem('user')
+      if (!storedUser) {
+        toast({
+          title: "Error",
+          description: "User not found. Please login again.",
+          variant: "destructive"
+        })
+        return
+      }
+      
+      const user = JSON.parse(storedUser)
+      if (!user.company_id) {
+        toast({
+          title: "Error",
+          description: "Company not found. Please login again.",
+          variant: "destructive"
+        })
+        return
+      }
+      
+      // Prepare accounts for import
+      const accountsToImport = data.map(item => ({
+        account_name: item.accountName || item.leadName || item.name || '',
+        industry: item.industry || '',
+        phone: item.phone || item.contactNo || '',
+        website: item.website || '',
+        billing_city: item.city || '',
+        billing_state: item.state || '',
+        billing_country: item.country || '',
+        status: item.status || 'Active',
+        owner_id: user.id
+      }))
+      
+      let successCount = 0
+      let failCount = 0
+      
+      // Import accounts one by one (or in batches)
+      for (const account of accountsToImport) {
+        if (!account.account_name) {
+          failCount++
+          continue
+        }
+        
+        try {
+          const response = await fetch('/api/accounts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              companyId: user.company_id,
+              ...account
+            })
+          })
+          
+          if (response.ok) {
+            successCount++
+          } else {
+            failCount++
+          }
+        } catch (error) {
+          console.error('Error importing account:', error)
+          failCount++
+        }
+      }
+      
+      // Reload accounts from API
+      await loadAccountsFromAPI()
+      
+      toast({
+        title: "Import completed",
+        description: `Successfully imported ${successCount} accounts. ${failCount > 0 ? `Failed: ${failCount}` : ''}`
+      })
+      
+    } catch (error) {
+      console.error('Import error:', error)
+      toast({
+        title: "Import failed",
+        description: "An error occurred while importing accounts.",
+        variant: "destructive"
+      })
+    }
   }
 
   const handleExport = () => {
@@ -360,7 +471,7 @@ export function AccountsContent() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{accountStats.active}</div>
-            <p className="text-xs text-muted-foreground">{accountStats.conversionRate}% of total</p>
+            <p className="text-xs text-muted-foreground">{Math.round((accountStats.active / accountStats.total) * 100) || 0}% of total</p>
           </CardContent>
         </Card>
         <Card>

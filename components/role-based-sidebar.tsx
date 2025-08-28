@@ -44,6 +44,7 @@ import {
   Ticket,
   Lightbulb,
   Receipt,
+  CheckCircle,
 } from "lucide-react"
 
 // Define user roles and their accessible modules with categorized structure based on Zoho CRM design
@@ -190,7 +191,37 @@ const roleBasedNavigation = {
         { name: "Leads", href: "/leads", icon: UserCheck, badge: "298" },
         { name: "Contacts", href: "/contacts", icon: Contact, badge: "1.2K" },
         { name: "Accounts", href: "/accounts", icon: Building2, badge: "3.9K" },
-        { name: "Deals", href: "/opportunities", icon: Handshake, badge: "8" },
+        { name: "Deals", href: "/opportunities", icon: Handshake, badge: "15" },
+      ]
+    },
+    {
+      name: "Inventory",
+      icon: Package,
+      type: "category",
+      children: [
+        { name: "Products", href: "/products", icon: Package, badge: "2K+" },
+        { name: "Quotations", href: "/quotations", icon: FileText, badge: "12" },
+        { name: "Sales Orders", href: "/sales-orders", icon: ShoppingCart, badge: "23" },
+        { name: "Invoices", href: "/invoices", icon: Receipt, badge: "45" },
+      ]
+    },
+    {
+      name: "Services",
+      icon: Wrench,
+      type: "category",
+      children: [
+        { name: "Installations", href: "/installations", icon: Wrench, badge: "8" },
+        { name: "AMC", href: "/amc", icon: Calendar, badge: "89" },
+        { name: "Complaints", href: "/complaints", icon: AlertTriangle, badge: "23" },
+      ]
+    },
+    {
+      name: "Projects",
+      icon: Briefcase,
+      type: "category",
+      children: [
+        { name: "Projects", href: "/projects", icon: Briefcase, badge: "12" },
+        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: "156" },
       ]
     },
     {
@@ -371,11 +402,54 @@ const roleBasedNavigation = {
 
 export function RoleBasedSidebar() {
   const [collapsed, setCollapsed] = useState(false)
+  const [currentUser, setCurrentUser] = useState<any>(null)
   const pathname = usePathname()
   
-  // Use Sales Manager role by default (shows all navigation items)
-  const currentRole = "Sales Manager"
-  const navigation = roleBasedNavigation[currentRole] || []
+  // Get current user from localStorage
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user')
+    if (storedUser) {
+      setCurrentUser(JSON.parse(storedUser))
+    }
+  }, [])
+  
+  // Use current user's role, fallback to Sales Manager
+  const currentRole = currentUser?.role?.name?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || "Sales Manager"
+  let navigation = roleBasedNavigation[currentRole] || roleBasedNavigation["Sales Manager"] || []
+  
+  // Update admin links based on user type
+  if (currentUser?.is_admin || currentUser?.is_super_admin) {
+    navigation = navigation.map(item => {
+      if (item.type === "category" && item.children) {
+        return {
+          ...item,
+          children: item.children.map(child => {
+            if (child.href === "/admin") {
+              // Company admins go to company-admin page, super admins go to admin page
+              return {
+                ...child,
+                name: currentUser?.is_super_admin ? "Admin" : "Company Admin",
+                href: currentUser?.is_super_admin ? "/admin" : "/company-admin"
+              }
+            }
+            return child
+          })
+        }
+      }
+      return item
+    })
+  } else {
+    // Filter out Admin link for non-admin users
+    navigation = navigation.map(item => {
+      if (item.type === "category" && item.children) {
+        return {
+          ...item,
+          children: item.children.filter(child => child.href !== "/admin")
+        }
+      }
+      return item
+    }).filter(item => item.href !== "/admin") // Also remove direct admin links
+  }
   
   // Initialize with no categories expanded by default  
   const [expandedCategories, setExpandedCategories] = useState<string[]>([])
@@ -600,36 +674,6 @@ export function RoleBasedSidebar() {
           </nav>
         </ScrollArea>
 
-        {/* Footer with user info */}
-        <div className="p-3 border-t border-gray-200">
-          {!collapsed ? (
-            <div className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50">
-              <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                PS
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">Prashanth S.</p>
-                <p className="text-xs text-gray-500 truncate">{currentRole}</p>
-              </div>
-              <div className="relative">
-                <Bell className="w-4 h-4 text-gray-400" />
-                <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></div>
-              </div>
-            </div>
-          ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white text-sm font-medium mx-auto cursor-pointer">
-                  PS
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Prashanth Sandilya</p>
-                <p className="text-xs text-muted-foreground">{currentRole}</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </div>
       </div>
     </TooltipProvider>
   )

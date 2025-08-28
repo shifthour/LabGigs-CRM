@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
+import * as XLSX from 'xlsx'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -268,36 +269,92 @@ export function DataImportModal({ isOpen, onClose, moduleType, onImport }: DataI
     if (!file) return
 
     setUploadedFile(file)
-
-    // Simulate CSV parsing (in real implementation, use a CSV parsing library)
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const content = e.target?.result as string
-      const lines = content.split('\n')
-      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
-      const data = lines.slice(1).filter(line => line.trim()).map(line => {
-        const values = line.split(',').map(v => v.trim().replace(/"/g, ''))
-        const row: any = {}
-        headers.forEach((header, index) => {
-          row[header] = values[index] || ''
+    
+    const fileExtension = file.name.split('.').pop()?.toLowerCase()
+    
+    if (fileExtension === 'csv') {
+      // Handle CSV files
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const content = e.target?.result as string
+        const lines = content.split('\n')
+        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
+        const data = lines.slice(1).filter(line => line.trim()).map(line => {
+          const values = line.split(',').map(v => v.trim().replace(/"/g, ''))
+          const row: any = {}
+          headers.forEach((header, index) => {
+            row[header] = values[index] || ''
+          })
+          return row
         })
-        return row
-      })
 
-      setCsvHeaders(headers)
-      setCsvData(data)
-      
-      // Initialize field mappings
-      const mappings: FieldMapping[] = currentConfig.fields.map(field => ({
-        csvField: '',
-        crmField: field.key,
-        required: field.required
-      }))
-      setFieldMappings(mappings)
-      
-      setCurrentStep(2)
+        setCsvHeaders(headers)
+        setCsvData(data)
+        
+        // Initialize field mappings
+        const mappings: FieldMapping[] = currentConfig.fields.map(field => ({
+          csvField: '',
+          crmField: field.key,
+          required: field.required
+        }))
+        setFieldMappings(mappings)
+        
+        setCurrentStep(2)
+      }
+      reader.readAsText(file)
+    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+      // Handle Excel files
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        try {
+          const data = e.target?.result
+          const workbook = XLSX.read(data, { type: 'binary' })
+          
+          // Get the first worksheet
+          const firstSheetName = workbook.SheetNames[0]
+          const worksheet = workbook.Sheets[firstSheetName]
+          
+          // Convert to JSON
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][]
+          
+          if (jsonData.length === 0) {
+            alert('The Excel file appears to be empty')
+            return
+          }
+          
+          // Extract headers from first row
+          const headers = jsonData[0].map(h => String(h || '').trim())
+          
+          // Extract data from remaining rows
+          const dataRows = jsonData.slice(1).filter(row => row.some(cell => cell)).map(row => {
+            const rowData: any = {}
+            headers.forEach((header, index) => {
+              rowData[header] = row[index] || ''
+            })
+            return rowData
+          })
+          
+          setCsvHeaders(headers)
+          setCsvData(dataRows)
+          
+          // Initialize field mappings
+          const mappings: FieldMapping[] = currentConfig.fields.map(field => ({
+            csvField: '',
+            crmField: field.key,
+            required: field.required
+          }))
+          setFieldMappings(mappings)
+          
+          setCurrentStep(2)
+        } catch (error) {
+          console.error('Error parsing Excel file:', error)
+          alert('Error reading Excel file. Please check the file format.')
+        }
+      }
+      reader.readAsBinaryString(file)
+    } else {
+      alert('Please upload a CSV or Excel file')
     }
-    reader.readAsText(file)
   }
 
   const handleFieldMapping = (crmField: string, csvField: string) => {

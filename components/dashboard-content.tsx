@@ -1,550 +1,539 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { EnhancedCard } from "@/components/ui/enhanced-card"
-import { StatusIndicator } from "@/components/ui/status-indicator"
-import { Users, Package, AlertTriangle, Calendar, Coins, Target, Plus, ArrowRight, Bell, Brain, Sparkles, Building2, Handshake } from "lucide-react"
-import { SalesChart } from "@/components/sales-chart"
-import { ComplaintsChart } from "@/components/complaints-chart"
 import { Badge } from "@/components/ui/badge"
-import { AdvancedAnalytics } from "@/components/advanced-analytics"
-import { AIInsightsPanel } from "@/components/ai-insights-panel"
-import { AIInsightsService, LeadData, OpportunityData, ComplaintData } from "@/lib/ai-services"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { 
+  Users, Package, AlertTriangle, Calendar, Coins, Target, Plus, ArrowRight, Brain, Sparkles, 
+  Building2, Handshake, TrendingUp, TrendingDown, Activity, Eye, Edit, Phone, Mail, MessageSquare,
+  MapPin, Star, Clock, ChevronUp, ChevronDown, Filter, Search, Zap
+} from "lucide-react"
 
-const stats = [
-  {
-    title: "Total Revenue",
-    value: "₹72,84,475",
-    change: { value: "+12.5%", type: "positive" as const, period: "from last month" },
-    icon: Coins,
-    trend: "up" as const,
-  },
-  {
-    title: "Active Leads",
-    value: "298",
-    change: { value: "+8.2%", type: "positive" as const, period: "from last month" },
-    icon: Users,
-    trend: "up" as const,
-  },
-  {
-    title: "Deals",
-    value: "156",
-    change: { value: "+18.7%", type: "positive" as const, period: "from last month" },
-    icon: Handshake,
-    trend: "up" as const,
-  },
-  {
-    title: "Products Sold",
-    value: "1,247",
-    change: { value: "+15.3%", type: "positive" as const, period: "from last month" },
-    icon: Package,
-    trend: "up" as const,
-  },
-  {
-    title: "Open Complaints",
-    value: "23",
-    change: { value: "-5.1%", type: "negative" as const, period: "from last month" },
-    icon: AlertTriangle,
-    trend: "down" as const,
-  },
-]
-
-const salesTargets = [
-  { name: "Monthly Target", current: 42500, target: 50000, percentage: 85 },
-  { name: "Quarterly Target", current: 128500, target: 150000, percentage: 86 },
-  { name: "Annual Target", current: 485000, target: 600000, percentage: 81 },
-]
-
-const urgentTasks = [
-  { title: "Follow up with TSAR Labcare", priority: "high", dueDate: "Today" },
-  { title: "Prepare quotation for Eurofins", priority: "medium", dueDate: "Tomorrow" },
-  { title: "Schedule installation visit", priority: "high", dueDate: "This week" },
-]
-
+// Enhanced AI Dashboard based on PDF recommendations
 export function DashboardContent() {
-  // Sample data for AI insights
-  const sampleLeads: LeadData[] = [
-    {
-      id: "006/25-26",
-      date: "24/04/2025",
-      leadName: "Guna Foods",
-      location: "Villupuram/Tamil Nadu",
-      contactName: "Pauline",
-      contactNo: "",
-      assignedTo: "Hari Kumar K",
-      product: "ANALYTICAL BALANCE (AS 220.R2)",
-      salesStage: "Prospecting",
-      closingDate: "",
-      buyerRef: "",
-      priority: "high",
+  const [mounted, setMounted] = useState(false)
+  const [currentTime, setCurrentTime] = useState(new Date())
+  const [aiChatOpen, setAiChatOpen] = useState(false)
+  const [currentUser, setCurrentUser] = useState<any>(null)
+
+  useEffect(() => {
+    setMounted(true)
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    
+    // Load current user from localStorage
+    const storedUser = localStorage.getItem('user')
+    if (storedUser) {
+      try {
+        setCurrentUser(JSON.parse(storedUser))
+      } catch (error) {
+        console.error('Error parsing user data:', error)
+      }
     }
-  ]
-  
-  const sampleOpportunities: OpportunityData[] = [
-    {
-      id: "OPP-001",
-      accountName: "TSAR Labcare",
-      contactName: "Mr. Mahesh",
-      product: "TRICOLOR MULTICHANNEL FIBRINOMETER",
-      value: "₹8,50,000",
-      stage: "Negotiation",
-      probability: "85%",
-      expectedClose: "30/08/2025",
-      source: "Referral"
-    }
-  ]
-  
-  const sampleComplaints: ComplaintData[] = [
-    {
-      id: "2016-17/010",
-      date: "27/02/2017",
-      accountName: "JNCASR",
-      contactName: "Dr. Anu Rang",
-      productService: "ND 1000 Spectrophotometer-ND 1000",
-      complaintType: "No Warranty/AMC",
-      severity: "High",
-      status: "New",
-      description: "Equipment not functioning properly, requires immediate attention",
-    }
-  ]
-  
-  const aiInsights = AIInsightsService.generateDashboardInsights(
-    sampleLeads,
-    sampleOpportunities,
-    sampleComplaints
-  )
+    
+    return () => clearInterval(timer)
+  }, [])
+
+  // Prevent hydration mismatch by not rendering time-sensitive content on server
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <div className="p-6 space-y-6">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Enhanced Welcome Section with AI Context */}
-      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 rounded-xl p-6 text-white relative overflow-hidden">
-        <div className="relative z-10">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      {/* Header */}
+      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-200">
+        <div className="p-4">
           <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <div className="flex items-center space-x-3 mb-2">
-                <h1 className="text-2xl font-bold">Welcome back, Prashanth!</h1>
-                <Badge className="bg-green-500/20 text-green-200 border border-green-400/30">
-                  AI Active
-                </Badge>
-              </div>
-              <p className="text-blue-100 mb-3">Your AI assistant has been busy analyzing your pipeline.</p>
-              
-              {/* AI-Generated Daily Summary */}
-              <div className="flex flex-wrap gap-4 text-sm">
-                <div className="flex items-center space-x-2 bg-white/10 rounded-full px-3 py-1">
-                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                  <span>15 new leads scored</span>
-                </div>
-                <div className="flex items-center space-x-2 bg-white/10 rounded-full px-3 py-1">
-                  <span className="w-2 h-2 bg-yellow-400 rounded-full"></span>
-                  <span>3 deals need attention</span>
-                </div>
-                <div className="flex items-center space-x-2 bg-white/10 rounded-full px-3 py-1">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
-                  <span>Next month: +17% revenue predicted</span>
-                </div>
+            <div className="flex items-center space-x-4">
+              {/* AI Chat Toggle */}
+              <div className="flex items-center space-x-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setAiChatOpen(!aiChatOpen)}
+                  className={`hover:bg-purple-100 ${aiChatOpen ? 'bg-purple-100 text-purple-700' : ''}`}
+                >
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  Ask LabGig AI
+                </Button>
               </div>
             </div>
             
-            <div className="flex items-center space-x-3">              
-              {/* AI Status Indicator with Notifications */}
-              <div className="relative">
-                <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 hover:bg-white/20 transition-colors cursor-pointer">
-                  <Brain className="h-6 w-6" />
-                  <Badge className="absolute -top-2 -right-2 bg-red-500 text-white min-w-[20px] h-5 flex items-center justify-center text-xs">
-                    3
-                  </Badge>
-                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
-                </div>
-                {/* AI Smart notification preview */}
-                <div className="absolute right-0 top-full mt-2 w-80 bg-white text-gray-900 rounded-lg shadow-lg border opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
-                  <div className="p-3 border-b bg-gradient-to-r from-purple-50 to-blue-50">
-                    <div className="flex items-center space-x-2">
-                      <Brain className="w-4 h-4 text-purple-600" />
-                      <span className="font-semibold text-sm">🤖 AI Insights</span>
-                      <Badge className="text-xs bg-purple-100 text-purple-800">Live</Badge>
-                    </div>
-                  </div>
-                  <div className="p-3">
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2 text-sm">
-                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                        <span className="font-medium">TSAR Labcare deal at risk</span>
-                        <Badge className="text-xs bg-red-100 text-red-800">Urgent</Badge>
-                      </div>
-                      <div className="flex items-center space-x-2 text-sm">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="font-medium">Eurofins: Ready for quote</span>
-                        <Badge className="text-xs bg-green-100 text-green-800">Ready</Badge>
-                      </div>
-                      <div className="flex items-center space-x-2 text-sm">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        <span className="font-medium">5 leads scored above 80%</span>
-                        <Badge className="text-xs bg-blue-100 text-blue-800">Hot</Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+            <div className="flex items-center space-x-3">
+              <div className="text-sm text-gray-600">
+                {currentTime.toLocaleTimeString()}
               </div>
             </div>
           </div>
         </div>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24" />
       </div>
 
-      {/* Enhanced Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        {stats.map((stat) => (
-          <EnhancedCard
-            key={stat.title}
-            title={stat.title}
-            value={stat.value}
-            change={stat.change}
-            icon={stat.icon}
-            trend={stat.trend}
-          />
-        ))}
-      </div>
-
-      {/* Quick Actions Bar */}
-      <Card className="border-dashed border-2 border-gray-200 hover:border-blue-300 transition-colors">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-lg">Quick Actions</h3>
-              <p className="text-muted-foreground">Frequently used actions for faster workflow</p>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Lead
-              </Button>
-              <Button variant="outline" size="sm">
-                <Package className="w-4 h-4 mr-2" />
-                New Product
-              </Button>
-              <Button variant="outline" size="sm">
-                <Building2 className="w-4 h-4 mr-2" />
-                New Account
-              </Button>
-              <Button variant="outline" size="sm">
-                <AlertTriangle className="w-4 h-4 mr-2" />
-                Log Complaint
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Charts and Activities */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SalesChart />
-        <ComplaintsChart />
-      </div>
-
-      {/* Sales Targets and Urgent Tasks */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Target className="w-5 h-5 mr-2" />
-              Sales Targets
-            </CardTitle>
-            <CardDescription>Track your progress towards sales goals</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {salesTargets.map((target) => (
-              <div key={target.name} className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium">{target.name}</span>
-                  <span className="text-gray-600">
-                    ₹{target.current.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")} / ₹{target.target.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-                  </span>
+      <div className="p-6 space-y-6">
+        {/* AI-Powered Welcome Section */}
+        <Card className="text-white overflow-hidden relative bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800">
+          <CardContent className="p-6 relative z-10">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center space-x-3 mb-2">
+                  <h1 className="text-2xl font-bold">
+                    {(() => {
+                      const hour = currentTime.getHours()
+                      let greeting = 'Good morning'
+                      if (hour >= 12 && hour < 17) {
+                        greeting = 'Good afternoon'
+                      } else if (hour >= 17) {
+                        greeting = 'Good evening'
+                      }
+                      return `${greeting}, ${currentUser?.full_name || 'User'}!`
+                    })()}
+                  </h1>
+                  <Badge className="bg-white/20 text-white border border-white/30">
+                    🤖 AI Active
+                  </Badge>
                 </div>
-                <Progress value={target.percentage} className="h-3" />
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">{target.percentage}% completed</span>
-                  <StatusIndicator
-                    status={target.percentage >= 90 ? "On Track" : target.percentage >= 70 ? "Good" : "Behind"}
-                    variant={target.percentage >= 90 ? "success" : target.percentage >= 70 ? "warning" : "error"}
-                    size="sm"
-                  />
+                <p className="text-white/90 mb-4">Ready to boost your sales today!</p>
+                
+                {/* AI Summary Pills */}
+                <div className="flex flex-wrap gap-3">
+                  <div className="bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <span className="text-sm">12 high-priority tasks</span>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                    <span className="text-sm">₹8.5L deals need attention</span>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                    <span className="text-sm">Tamil Nadu: +40% performance</span>
+                  </div>
                 </div>
               </div>
-            ))}
+              
+              <div className="relative">
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 hover:bg-white/20 transition-colors cursor-pointer">
+                  <Brain className="w-8 h-8" />
+                  <Badge className="absolute -top-2 -right-2 bg-red-500 text-white min-w-[20px] h-5 flex items-center justify-center text-xs">
+                    3
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+          {/* Decorative elements */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+        </Card>
+
+        {/* Modular Card Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Revenue Card with Visual Confidence Indicator */}
+          <Card className="hover:shadow-lg transition-all duration-300 border-0 shadow-md bg-gradient-to-br from-emerald-50 to-green-100">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-600">Monthly Revenue</p>
+                  <div className="flex items-baseline space-x-2">
+                    <p className="text-2xl font-bold text-gray-900">₹72.8L</p>
+                    <div className="flex items-center space-x-1 text-green-600">
+                      <TrendingUp className="w-4 h-4" />
+                      <span className="text-sm font-medium">+12.5%</span>
+                    </div>
+                  </div>
+                  {/* AI Confidence Ring */}
+                  <div className="flex items-center space-x-2">
+                    <div className="relative w-8 h-8">
+                      <svg className="w-8 h-8 transform -rotate-90" viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="14" stroke="#e5e7eb" strokeWidth="3" fill="none" />
+                        <circle 
+                          cx="16" cy="16" r="14" 
+                          stroke="#10b981" strokeWidth="3" fill="none"
+                          strokeDasharray={`${85 * 0.87} 87.96`}
+                          className="transition-all duration-500"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-xs font-medium text-green-600">85%</span>
+                      </div>
+                    </div>
+                    <span className="text-xs text-gray-500">AI Confidence</span>
+                  </div>
+                </div>
+                <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
+                  <Coins className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Leads Card with Sparkline */}
+          <Card className="hover:shadow-lg transition-all duration-300 border-0 shadow-md bg-gradient-to-br from-blue-50 to-indigo-100">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-600">Active Leads</p>
+                  <div className="flex items-baseline space-x-2">
+                    <p className="text-2xl font-bold text-gray-900">298</p>
+                    <div className="flex items-center space-x-1 text-blue-600">
+                      <TrendingUp className="w-4 h-4" />
+                      <span className="text-sm font-medium">+8.2%</span>
+                    </div>
+                  </div>
+                  {/* Mini Sparkline */}
+                  <div className="w-20 h-6">
+                    <svg className="w-full h-full" viewBox="0 0 80 24">
+                      <polyline
+                        fill="none"
+                        stroke="#3b82f6"
+                        strokeWidth="2"
+                        points="0,20 10,16 20,18 30,12 40,8 50,6 60,10 70,4 80,6"
+                      />
+                    </svg>
+                  </div>
+                </div>
+                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+                  <Users className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Deals Card */}
+          <Card className="hover:shadow-lg transition-all duration-300 border-0 shadow-md bg-gradient-to-br from-purple-50 to-violet-100">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-600">Active Deals</p>
+                  <div className="flex items-baseline space-x-2">
+                    <p className="text-2xl font-bold text-gray-900">156</p>
+                    <div className="flex items-center space-x-1 text-purple-600">
+                      <TrendingUp className="w-4 h-4" />
+                      <span className="text-sm font-medium">+18.7%</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                    <span className="text-xs text-gray-500">3 at risk</span>
+                  </div>
+                </div>
+                <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center">
+                  <Handshake className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Complaints Card */}
+          <Card className="hover:shadow-lg transition-all duration-300 border-0 shadow-md bg-gradient-to-br from-red-50 to-pink-100">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-600">Open Complaints</p>
+                  <div className="flex items-baseline space-x-2">
+                    <p className="text-2xl font-bold text-gray-900">23</p>
+                    <div className="flex items-center space-x-1 text-green-600">
+                      <TrendingDown className="w-4 h-4" />
+                      <span className="text-sm font-medium">-5.1%</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                    <span className="text-xs text-gray-500">5 critical</span>
+                  </div>
+                </div>
+                <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* AI Conversational Interface Sidebar */}
+        {aiChatOpen && (
+          <Card className="fixed right-6 top-20 w-80 h-96 shadow-2xl border-2 border-purple-200 z-50 bg-white">
+            <CardHeader className="bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-t-lg">
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Brain className="w-5 h-5" />
+                  <span>LabGig AI Assistant</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAiChatOpen(false)}
+                  className="text-white hover:bg-white/20"
+                >
+                  ×
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 h-full overflow-y-auto">
+              <div className="space-y-3">
+                <div className="bg-gray-100 rounded-lg p-3">
+                  <p className="text-sm">Hi! Ask me anything about your pipeline:</p>
+                  <div className="mt-2 space-y-1">
+                    <Button variant="ghost" size="sm" className="text-xs text-left w-full justify-start">
+                      "Show me Tamil Nadu leads"
+                    </Button>
+                    <Button variant="ghost" size="sm" className="text-xs text-left w-full justify-start">
+                      "What deals need attention?"
+                    </Button>
+                    <Button variant="ghost" size="sm" className="text-xs text-left w-full justify-start">
+                      "Schedule call with Eurofins"
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Priority Tasks - Smart Action Cards */}
+        <Card className="border-l-4 border-l-red-500 shadow-lg">
+          <CardHeader className="bg-gradient-to-r from-red-50 to-pink-50">
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center">
+                  <Zap className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">🎯 Priority Actions</h3>
+                  <p className="text-sm text-gray-600">AI-ranked by revenue impact</p>
+                </div>
+              </div>
+              <Badge className="bg-red-100 text-red-800">3 Critical</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              {/* Critical Task Card */}
+              <Card className="border-2 border-red-200 bg-gradient-to-r from-red-50 to-pink-50 hover:shadow-md transition-all cursor-pointer">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-3">
+                        <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                        <h4 className="font-bold text-gray-900">Follow up with TSAR Labcare</h4>
+                        <Badge className="bg-red-500 text-white text-xs">₹8.5L AT RISK</Badge>
+                      </div>
+                      <div className="ml-6 space-y-2">
+                        <div className="flex items-center space-x-4 text-sm text-gray-700">
+                          <div className="flex items-center space-x-1">
+                            <Clock className="w-4 h-4" />
+                            <span>Last contact: 5 days ago</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <Star className="w-4 h-4 text-yellow-500" />
+                            <span>AI Score: 85%</span>
+                          </div>
+                        </div>
+                        <div className="bg-white/50 rounded-lg p-3 border border-red-200">
+                          <p className="text-sm font-medium text-red-700 mb-2">🤖 AI Recommendation:</p>
+                          <p className="text-sm text-gray-700">Call TODAY before 3 PM. Customer availability pattern: 2-4 PM. Mention fibrinometer discussion and 15% early-bird discount.</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col space-y-2">
+                      <Button className="bg-red-500 hover:bg-red-600 text-white">
+                        <Phone className="w-4 h-4 mr-2" />
+                        Call Now
+                      </Button>
+                      <Button variant="outline" size="sm">
+                        <Mail className="w-4 h-4 mr-2" />
+                        Email
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* High Priority Task */}
+              <Card className="border border-yellow-200 bg-gradient-to-r from-yellow-50 to-orange-50 hover:shadow-md transition-all cursor-pointer">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                        <h4 className="font-semibold text-gray-900">Generate quotation for Eurofins</h4>
+                        <Badge className="bg-green-100 text-green-800 text-xs">🔥 HOT LEAD</Badge>
+                      </div>
+                      <div className="ml-6 space-y-1">
+                        <p className="text-sm text-gray-700">Similar deals: ₹12L avg • Win rate: 78% • Template QT-LAB-001 ready</p>
+                      </div>
+                    </div>
+                    <Button variant="outline" className="border-yellow-400 text-yellow-700 hover:bg-yellow-50">
+                      📄 Review Quote
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Interactive Pipeline Funnel Visualization */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Activity className="w-5 h-5 text-blue-600" />
+                <span>Sales Pipeline Funnel</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="relative">
+                  <div className="flex items-center justify-between bg-blue-100 rounded-lg p-3">
+                    <span className="font-medium">Prospects</span>
+                    <span className="font-bold">298 • ₹45.2L</span>
+                  </div>
+                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                    <ChevronDown className="w-4 h-4 text-blue-600" />
+                  </div>
+                </div>
+                <div className="relative ml-4">
+                  <div className="flex items-center justify-between bg-yellow-100 rounded-lg p-3">
+                    <span className="font-medium">Qualified</span>
+                    <span className="font-bold">156 • ₹32.8L</span>
+                  </div>
+                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                    <ChevronDown className="w-4 h-4 text-yellow-600" />
+                  </div>
+                </div>
+                <div className="relative ml-8">
+                  <div className="flex items-center justify-between bg-orange-100 rounded-lg p-3">
+                    <span className="font-medium">Proposal</span>
+                    <span className="font-bold">89 • ₹28.4L</span>
+                  </div>
+                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                    <ChevronDown className="w-4 h-4 text-orange-600" />
+                  </div>
+                </div>
+                <div className="relative ml-12">
+                  <div className="flex items-center justify-between bg-green-100 rounded-lg p-3">
+                    <span className="font-medium">Negotiation</span>
+                    <span className="font-bold">34 • ₹8.5L</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Geographic Performance Heat Map */}
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <MapPin className="w-5 h-5 text-green-600" />
+                <span>Regional Performance</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-green-100 rounded-lg border-l-4 border-green-500">
+                  <div>
+                    <p className="font-semibold">Tamil Nadu</p>
+                    <p className="text-sm text-gray-600">40% conversion rate</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-green-700">₹18.5L</p>
+                    <Badge className="bg-green-500 text-white text-xs">HOT</Badge>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-blue-100 rounded-lg">
+                  <div>
+                    <p className="font-semibold">Karnataka</p>
+                    <p className="text-sm text-gray-600">32% conversion rate</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-blue-700">₹12.3L</p>
+                    <Badge className="bg-blue-500 text-white text-xs">GOOD</Badge>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-yellow-100 rounded-lg">
+                  <div>
+                    <p className="font-semibold">Maharashtra</p>
+                    <p className="text-sm text-gray-600">28% conversion rate</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-yellow-700">₹9.8L</p>
+                    <Badge className="bg-yellow-500 text-white text-xs">AVG</Badge>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Live Intelligence Feed */}
+        <Card className="border-l-4 border-l-purple-500 bg-gradient-to-r from-purple-50 to-blue-50">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center">
+                <Brain className="w-5 h-5 text-white" />
+              </div>
+              <span>🤖 Live Intelligence Feed</span>
+              <Badge className="bg-green-500 text-white animate-pulse">LIVE</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-white rounded-xl border border-purple-200 shadow-sm">
+                <div className="flex items-center space-x-2 mb-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
+                  <span className="font-medium text-red-800">Real-time Alert</span>
+                </div>
+                <p className="text-sm text-gray-700">Eurofins visited pricing page 3x in last hour. High buying intent detected!</p>
+                <Button size="sm" className="mt-2 w-full bg-red-500 hover:bg-red-600">
+                  Contact Immediately
+                </Button>
+              </div>
+              
+              <div className="p-4 bg-white rounded-xl border border-green-200 shadow-sm">
+                <div className="flex items-center space-x-2 mb-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="font-medium text-green-800">AI Prediction</span>
+                </div>
+                <p className="text-sm text-gray-700">Next month revenue forecast: ₹85.2L (+17% growth)</p>
+                <div className="mt-2 flex items-center space-x-2">
+                  <div className="flex-1 bg-gray-200 rounded-full h-2">
+                    <div className="bg-green-500 h-2 rounded-full" style={{width: '87%'}}></div>
+                  </div>
+                  <span className="text-xs font-medium">87%</span>
+                </div>
+              </div>
+              
+              <div className="p-4 bg-white rounded-xl border border-blue-200 shadow-sm">
+                <div className="flex items-center space-x-2 mb-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span className="font-medium text-blue-800">Lead Scoring</span>
+                </div>
+                <p className="text-sm text-gray-700">15 new leads scored. 5 marked as high-priority for immediate follow-up.</p>
+                <Button size="sm" variant="outline" className="mt-2 w-full border-blue-400 text-blue-700">
+                  View Hot Leads
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
       </div>
-
-      {/* 🤖 AI Command Center - Unified AI Hub */}
-      <Card className="border-l-4 border-l-gradient-to-r from-purple-500 to-blue-500 bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="p-3 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 mr-3 shadow-lg">
-                <Brain className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-bold text-xl text-gray-800">🤖 AI Command Center</h3>
-                <p className="text-sm text-gray-600 font-normal">Your Autonomous Sales Intelligence Hub</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Badge className="bg-green-500 text-white animate-pulse">Live</Badge>
-              <Badge className="bg-gradient-to-r from-purple-500 to-blue-500 text-white">24/7 Active</Badge>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Priority Tasks Section */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="font-semibold text-lg flex items-center text-red-700">
-                <AlertTriangle className="w-5 h-5 mr-2" />
-                🎯 Priority Tasks
-                <Badge className="ml-2 bg-red-100 text-red-800 text-xs">Revenue Impact Sorted</Badge>
-              </h4>
-              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-800">
-                View All <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
-            </div>
-            
-            <div className="space-y-3">
-              {/* Critical Priority Task */}
-              <div className="p-4 rounded-xl border-2 border-red-200 bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 transition-all cursor-pointer shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                      <p className="font-bold text-gray-900">Follow up with TSAR Labcare</p>
-                      <Badge className="bg-red-100 text-red-800 text-xs font-bold">₹8.5L AT RISK</Badge>
-                      <Badge className="bg-red-500 text-white text-xs">CRITICAL</Badge>
-                    </div>
-                    <div className="ml-6 space-y-1">
-                      <p className="text-sm text-gray-700">🕐 Last contact: 5 days ago • 📊 AI Confidence: 85% close probability</p>
-                      <p className="text-sm font-semibold text-red-700">🤖 AI Command: Call TODAY before 3 PM - Customer usually available 2-4 PM</p>
-                      <p className="text-xs text-gray-600">💡 Talking points: Reference previous fibrinometer discussion, mention 15% early-bird discount</p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end space-y-2">
-                    <div className="text-right text-xs text-gray-600">
-                      <div className="font-semibold text-red-600">Impact: CRITICAL</div>
-                      <div className="font-semibold text-red-600">Urgency: TODAY</div>
-                    </div>
-                    <Button size="sm" className="bg-red-500 hover:bg-red-600 text-white">
-                      📞 Call Now
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* High Priority Task */}
-              <div className="p-4 rounded-xl border border-yellow-200 bg-gradient-to-r from-yellow-50 to-orange-50 hover:from-yellow-100 hover:to-orange-100 transition-all cursor-pointer">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                      <p className="font-semibold text-gray-900">Generate quotation for Eurofins</p>
-                      <Badge className="bg-green-100 text-green-800 text-xs">🔥 HOT LEAD</Badge>
-                      <Badge className="bg-yellow-100 text-yellow-800 text-xs">HIGH</Badge>
-                    </div>
-                    <div className="ml-6 space-y-1">
-                      <p className="text-sm text-gray-700">📅 Requested: 2 days ago • 💰 Similar deals: ₹12L average • 🎯 Win rate: 78%</p>
-                      <p className="text-sm font-semibold text-yellow-700">🤖 AI Recommendation: Use template QT-LAB-001, add 15% margin, include free training</p>
-                      <p className="text-xs text-gray-600">⚡ Auto-generated quote ready - just needs your approval</p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end space-y-2">
-                    <div className="text-right text-xs text-gray-600">
-                      <div>Impact: High</div>
-                      <div>Urgency: Medium</div>
-                    </div>
-                    <Button size="sm" variant="outline" className="border-yellow-400 text-yellow-700 hover:bg-yellow-50">
-                      📄 Review Quote
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Medium Priority Task */}
-              <div className="p-3 rounded-lg border border-blue-200 bg-blue-50/50 hover:bg-blue-100/50 transition-all cursor-pointer">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <p className="font-medium text-sm">Schedule installation - Kerala Agri University</p>
-                      <Badge className="bg-blue-100 text-blue-800 text-xs">PAID</Badge>
-                    </div>
-                    <p className="text-xs text-gray-600 ml-4">🤖 AI Insight: Customer prefers Mon-Wed mornings (9-11 AM)</p>
-                  </div>
-                  <Button size="sm" variant="ghost" className="text-blue-600">
-                    📅 Schedule
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* AI Intelligence Dashboard */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Smart Insights & Alerts */}
-            <div className="space-y-3">
-              <h4 className="font-semibold flex items-center text-purple-700">
-                <Sparkles className="w-4 h-4 mr-2" />
-                🔮 Smart Insights
-              </h4>
-              <div className="space-y-2">
-                {aiInsights.slice(0, 2).map((insight, index) => (
-                  <div key={index} className="p-3 bg-white rounded-lg border-l-4 border-l-purple-400 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{insight.title}</p>
-                        <p className="text-xs text-gray-600 mt-1">{insight.description}</p>
-                      </div>
-                      <Badge 
-                        className={insight.type === 'opportunity' ? 'bg-green-100 text-green-800' : 
-                                 insight.type === 'risk' ? 'bg-red-100 text-red-800' : 
-                                 'bg-blue-100 text-blue-800'}
-                      >
-                        {insight.priority}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-                
-                {/* Real-time Alert */}
-                <div className="p-3 bg-gradient-to-r from-red-50 to-pink-50 rounded-lg border border-red-200">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
-                    <p className="text-sm font-semibold text-red-800">🚨 Live Alert</p>
-                  </div>
-                  <p className="text-xs text-red-700 mt-1">Eurofins just visited pricing page 3x - High buying intent detected!</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Auto-Actions Status */}
-            <div className="space-y-3">
-              <h4 className="font-semibold flex items-center text-blue-700">
-                <Target className="w-4 h-4 mr-2" />
-                ⚡ Auto-Actions
-              </h4>
-              <div className="space-y-2">
-                <div className="p-3 bg-white rounded-lg border hover:shadow-sm transition-all">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                      <span className="text-green-600 text-sm">✅</span>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Lead Scoring Complete</p>
-                      <p className="text-xs text-gray-600">15 leads scored • 5 marked as hot</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="p-3 bg-white rounded-lg border hover:shadow-sm transition-all">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center animate-pulse">
-                      <span className="text-yellow-600 text-sm">⚡</span>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Risk Analysis Running</p>
-                      <p className="text-xs text-gray-600">Analyzing 23 deals • ETA: 2 min</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="p-3 bg-white rounded-lg border hover:shadow-sm transition-all">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                      <span className="text-blue-600 text-sm">🎯</span>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Follow-up Reminders Sent</p>
-                      <p className="text-xs text-gray-600">8 reminders • 3 SMS • 5 emails</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* AI Predictions */}
-            <div className="space-y-3">
-              <h4 className="font-semibold flex items-center text-green-700">
-                <Brain className="w-4 h-4 mr-2" />
-                📊 Predictions
-              </h4>
-              <div className="space-y-2">
-                <div className="p-3 bg-white rounded-lg border-l-4 border-l-green-400 hover:shadow-sm transition-shadow">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-green-600">📈</span>
-                      <p className="text-sm font-medium">Revenue Forecast</p>
-                    </div>
-                    <Badge className="bg-green-100 text-green-800 text-xs">87% confidence</Badge>
-                  </div>
-                  <p className="text-xs text-gray-600 mb-2">Next month: ₹85.2L (+17%)</p>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-green-500 h-2 rounded-full" style={{width: '85%'}}></div>
-                  </div>
-                </div>
-                
-                <div className="p-3 bg-white rounded-lg border-l-4 border-l-orange-400 hover:shadow-sm transition-shadow">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-orange-600">⚠️</span>
-                      <p className="text-sm font-medium">Churn Risk</p>
-                    </div>
-                    <Badge className="bg-orange-100 text-orange-800 text-xs">78% confidence</Badge>
-                  </div>
-                  <p className="text-xs text-gray-600 mb-2">3 accounts at risk</p>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-orange-500 h-2 rounded-full" style={{width: '25%'}}></div>
-                  </div>
-                </div>
-                
-                <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <span className="text-blue-600">🎯</span>
-                    <p className="text-sm font-medium">Hot Region</p>
-                  </div>
-                  <p className="text-xs text-gray-700">Tamil Nadu: +40% conversion</p>
-                  <Badge className="bg-blue-100 text-blue-800 text-xs mt-1">Focus Here!</Badge>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* AI Command Center Status Bar */}
-          <div className="p-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                  <Brain className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="font-bold">🤖 AI Command Center Status</p>
-                  <p className="text-sm opacity-90">Monitoring 298 leads • 23 deals • 15 accounts • 47 tasks</p>
-                </div>
-              </div>
-              <div className="flex space-x-2">
-                <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 text-white border-white/30">
-                  📊 Full Analytics
-                </Button>
-                <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 text-white border-white/30">
-                  💬 Chat with AI
-                </Button>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <AdvancedAnalytics />
     </div>
   )
 }

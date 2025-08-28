@@ -95,3 +95,68 @@
     @apply bg-background text-foreground font-sans;
   }
 }
+
+/* Hide any potential floating elements in bottom-left corner */
+@layer utilities {
+  .hide-bottom-left-floaters {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 80px;
+    height: 80px;
+    pointer-events: none;
+    z-index: 9999;
+  }
+  
+  /* Hide development tools and debugging widgets */
+  /* Next.js development overlay elements */
+  [data-nextjs-dialog],
+  [data-nextjs-dialog-overlay],
+  nextjs-portal,
+  __next-dev-overlay,
+  
+  /* React Developer Tools */
+  [data-react-devtools-portal-root],
+  [data-react-devtools],
+  
+  /* Redux DevTools */
+  [data-redux-devtools],
+  
+  /* Browser extension elements in bottom corners */
+  [style*="position: fixed"][style*="bottom: 0"][style*="left: 0"],
+  [style*="position: fixed"][style*="bottom:0"][style*="left:0"],
+  [style*="position: fixed"][style*="bottom: 10px"][style*="left: 10px"],
+  [style*="position: fixed"][style*="bottom: 20px"][style*="left: 20px"],
+  
+  /* Generic floating widgets in bottom-left */
+  [style*="position: fixed"][style*="bottom"][style*="left"]:not([class*="toast"]):not([role="dialog"]):not([role="alertdialog"]),
+  
+  /* Hide elements with debugging-related content */
+  [title*="developer"],
+  [title*="debug"],
+  [title*="preference"],
+  [title*="route"],
+  
+  /* Hide circular floating buttons in bottom-left */
+  [style*="border-radius: 50%"][style*="position: fixed"][style*="bottom"][style*="left"],
+  [class*="floating"][style*="bottom"][style*="left"],
+  [class*="fab"][style*="bottom"][style*="left"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  
+  /* Additional protection for bottom-left area */
+  body::after {
+    content: "";
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100px;
+    height: 100px;
+    background: transparent;
+    z-index: 99999;
+    pointer-events: none;
+  }
+}
