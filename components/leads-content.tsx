@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { EnhancedCard } from "@/components/ui/enhanced-card"
 import { StatusIndicator } from "@/components/ui/status-indicator"
-import { Plus, Download, Edit, Phone, Users, Target, TrendingUp, Clock, Zap, Filter, Mail, MessageCircle, Upload, Save, X, CheckCircle } from "lucide-react"
+import { Plus, Download, Edit, Phone, Users, Target, TrendingUp, Clock, Zap, Filter, Mail, MessageCircle, Upload, Save, X, CheckCircle, Search, Coins } from "lucide-react"
+import { exportToExcel, formatDateForExcel } from "@/lib/excel-export"
 import { AILeadScore } from "@/components/ai-lead-score"
 import { AIEmailGenerator } from "@/components/ai-email-generator"
 import { AIRecommendationService, type LeadData } from "@/lib/ai-services"
@@ -16,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import storageService from "@/lib/localStorage-service"
+import { AddLeadModalSimplified } from "@/components/add-lead-modal-simplified"
 
 // Custom WhatsApp Icon Component
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -25,59 +26,6 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
-const leads = [
-  {
-    id: "006/25-26",
-    date: "24/04/2025",
-    leadName: "Guna Foods",
-    location: "Villupuram/Tamil Nadu",
-    contactName: "Pauline",
-    contactNo: "+91 95432 10987",
-    email: "pauline@gunafoods.com",
-    whatsapp: "+91 95432 10987",
-    assignedTo: "Hari Kumar K",
-    product: "ANALYTICAL BALANCE (AS 220.R2)",
-    salesStage: "Prospecting",
-    closingDate: "",
-    buyerRef: "",
-    priority: "high",
-    status: "active",
-  },
-  {
-    id: "001/25-26",
-    date: "01/04/2025",
-    leadName: "Agferm Innovation",
-    location: "Hoskote/Karnataka",
-    contactName: "Mr. Ibomcha",
-    contactNo: "+91 79755 89338",
-    email: "ibomcha@agferm.com",
-    whatsapp: "+91 79755 89338",
-    assignedTo: "Hari Kumar K",
-    product: "LABORATORY FREEZE DRYER/LYOPHILIZER",
-    salesStage: "Prospecting",
-    closingDate: "30/06/2025",
-    buyerRef: "",
-    priority: "medium",
-    status: "active",
-  },
-  {
-    id: "252/24-25",
-    date: "24/03/2025",
-    leadName: "Abexome Biosciences",
-    location: "Bangalore/Karnataka",
-    contactName: "Dr. Smitha P",
-    contactNo: "+91 80 41215491",
-    email: "smitha.p@abexome.com",
-    whatsapp: "+91 98765 43210",
-    assignedTo: "Vijay Muppala",
-    product: "MICRO-VOLUME SPECTROPHOTOMETER",
-    salesStage: "Prospecting",
-    closingDate: "",
-    buyerRef: "",
-    priority: "high",
-    status: "inactive",
-  },
-]
 
 
 export function LeadsContent() {
@@ -86,16 +34,17 @@ export function LeadsContent() {
   const [leadsList, setLeadsList] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedStage, setSelectedStage] = useState("All")
-  const [selectedPriority, setSelectedPriority] = useState("All")
-  const [leadFilter, setLeadFilter] = useState("all")
+  const [selectedAssignedTo, setSelectedAssignedTo] = useState("All")
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [editingLead, setEditingLead] = useState<any>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false)
+  const [statsLoaded, setStatsLoaded] = useState(false)
   const [leadsStats, setLeadsStats] = useState({
     total: 0,
     qualified: 0,
     conversionRate: 0,
-    avgResponseTime: "0h"
+    totalPipelineValue: 0
   })
 
   // Load leads from localStorage on component mount
@@ -103,51 +52,122 @@ export function LeadsContent() {
     loadLeads()
   }, [])
 
-  const loadLeads = () => {
-    const storedLeads = storageService.getAll<any>('leads')
-    console.log("loadLeads - storedLeads:", storedLeads)
-    setLeadsList(storedLeads)
-    
-    // Calculate stats
-    const stats = storageService.getStats('leads')
-    const qualifiedLeads = storedLeads.filter(lead => lead.salesStage === 'Qualified' || lead.salesStage === 'Proposal' || lead.salesStage === 'Negotiation').length
-    const conversionRate = storedLeads.length > 0 ? Math.round((qualifiedLeads / storedLeads.length) * 100) : 0
-    
-    setLeadsStats({
-      total: stats.total,
-      qualified: qualifiedLeads,
-      conversionRate: conversionRate,
-      avgResponseTime: "2.4h" // Static for now
-    })
+  const loadLeads = async () => {
+    try {
+      const companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
+      const response = await fetch(`/api/leads?companyId=${companyId}`)
+      
+      if (response.ok) {
+        const apiLeads = await response.json()
+        
+        // Transform API data to match UI format
+        const transformedLeads = apiLeads.map((lead: any) => ({
+          id: lead.id,
+          date: new Date(lead.lead_date || lead.created_at).toLocaleDateString('en-GB'),
+          leadName: lead.account_name,
+          accountId: lead.account_id,
+          accountName: lead.account_name,
+          contactId: lead.contact_id,
+          contactName: lead.contact_name,
+          department: lead.department || '',
+          contactNo: lead.phone,
+          phone: lead.phone,
+          email: lead.email,
+          whatsapp: lead.whatsapp || lead.phone,
+          assignedTo: lead.assigned_to,
+          product: lead.product_name,
+          productId: lead.product_id,
+          leadSource: lead.lead_source,
+          salesStage: lead.lead_status,
+          leadStatus: lead.lead_status,
+          status: 'active',
+          priority: lead.priority || 'medium',
+          location: lead.location || '',
+          city: lead.city || '',
+          state: lead.state || '',
+          country: lead.country || '',
+          address: lead.address || '',
+          closingDate: lead.expected_closing_date || '',
+          buyerRef: lead.buyer_ref || '',
+          budget: lead.budget,
+          quantity: lead.quantity,
+          pricePerUnit: lead.price_per_unit,
+          expectedClosingDate: lead.expected_closing_date,
+          nextFollowupDate: lead.next_followup_date,
+          notes: lead.notes
+        }))
+        
+        console.log("loadLeads - API leads:", transformedLeads)
+        setLeadsList(transformedLeads)
+        
+        // Calculate stats
+        const qualifiedLeads = transformedLeads.filter((lead: any) => 
+          lead.salesStage === 'Qualified' || lead.salesStage === 'Proposal' || lead.salesStage === 'Negotiation'
+        ).length
+        const conversionRate = transformedLeads.length > 0 ? Math.round((qualifiedLeads / transformedLeads.length) * 100) : 0
+        
+        // Calculate total pipeline value from all budgets
+        const totalPipelineValue = transformedLeads.reduce((sum: number, lead: any) => {
+          const budget = parseFloat(lead.budget) || 0
+          return sum + budget
+        }, 0)
+        
+        setLeadsStats({
+          total: transformedLeads.length,
+          qualified: qualifiedLeads,
+          conversionRate: conversionRate,
+          totalPipelineValue: totalPipelineValue
+        })
+        setStatsLoaded(true)
+        
+        return
+      }
+    } catch (error) {
+      console.error('Error loading leads from API:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load leads from database",
+        variant: "destructive"
+      })
+      setStatsLoaded(true)
+    }
   }
 
   const stats = [
     {
       title: "Total Leads",
-      value: leadsStats.total.toString(),
+      value: !statsLoaded ? "..." : leadsStats.total.toString(),
       change: { value: "+18.6%", type: "positive" as const, period: "from last month" },
       icon: Users,
+      iconColor: "text-blue-600",
+      iconBg: "bg-blue-100",
       trend: "up" as const,
     },
     {
       title: "Qualified Leads",
-      value: leadsStats.qualified.toString(),
+      value: !statsLoaded ? "..." : leadsStats.qualified.toString(),
       change: { value: "+12.4%", type: "positive" as const, period: "from last month" },
       icon: CheckCircle,
+      iconColor: "text-green-600",
+      iconBg: "bg-green-100",
       trend: "up" as const,
     },
     {
-      title: "Conversion Rate",
-      value: `${leadsStats.conversionRate}%`,
+      title: "Qualification Rate",
+      value: !statsLoaded ? "..." : `${leadsStats.conversionRate}%`,
       change: { value: "+2.3%", type: "positive" as const, period: "improvement" },
       icon: TrendingUp,
+      iconColor: "text-purple-600",
+      iconBg: "bg-purple-100",
       trend: "up" as const,
     },
     {
-      title: "Avg. Response Time",
-      value: leadsStats.avgResponseTime,
-      change: { value: "-0.5h", type: "positive" as const, period: "faster response" },
-      icon: Clock,
+      title: "Total Pipeline Value",
+      value: !statsLoaded ? "..." : `₹${leadsStats.totalPipelineValue.toLocaleString()}`,
+      change: { value: "+15.2%", type: "positive" as const, period: "from last month" },
+      icon: Coins,
+      iconColor: "text-orange-600",
+      iconBg: "bg-orange-100",
       trend: "up" as const,
     },
   ]
@@ -185,10 +205,31 @@ export function LeadsContent() {
   }
 
   const filteredLeads = leadsList.filter((lead) => {
-    if (leadFilter === "active") {
-      return lead.status === "active"
+    // Search filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase()
+      const matchesSearch = 
+        lead.leadName?.toLowerCase().includes(searchLower) ||
+        lead.contactName?.toLowerCase().includes(searchLower) ||
+        lead.city?.toLowerCase().includes(searchLower) ||
+        lead.state?.toLowerCase().includes(searchLower) ||
+        lead.email?.toLowerCase().includes(searchLower) ||
+        lead.phone?.includes(searchTerm)
+      if (!matchesSearch) return false
     }
-    return true // Show all leads
+    
+    // Stage filter
+    if (selectedStage !== "All" && lead.leadStatus !== selectedStage) {
+      return false
+    }
+    
+    // Assigned to filter  
+    if (selectedAssignedTo !== "All" && lead.assignedTo !== selectedAssignedTo) {
+      return false
+    }
+    
+    
+    return true
   })
 
   const handleCommunicationAction = (type: string, contact: string, leadName: string) => {
@@ -214,53 +255,295 @@ export function LeadsContent() {
     }
   }
 
-  const handleImportData = (importedLeads: any[]) => {
-    console.log('Imported leads:', importedLeads)
-    const createdLeads = storageService.createMany('leads', importedLeads)
-    
-    // Immediately add imported leads to state
-    setLeadsList(prevLeads => [...prevLeads, ...createdLeads])
-    
-    // Update stats
-    loadLeads()
-    
-    toast({
-      title: "Data imported",
-      description: `Successfully imported ${createdLeads.length} leads.`
-    })
+  const handleImportData = async (importedLeads: any[]) => {
+    try {
+      const companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
+      
+      // Save imported leads to database instead of localStorage
+      const promises = importedLeads.map(async (leadData) => {
+        const response = await fetch('/api/leads', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            companyId,
+            ...leadData
+          })
+        })
+        return response.json()
+      })
+      
+      await Promise.all(promises)
+      
+      // Reload leads from database
+      loadLeads()
+      
+      toast({
+        title: "Data imported",
+        description: `Successfully imported ${importedLeads.length} leads to database.`
+      })
+    } catch (error) {
+      console.error('Error importing leads:', error)
+      toast({
+        title: "Import failed",
+        description: "Failed to import leads to database",
+        variant: "destructive"
+      })
+    }
   }
 
   const handleEditLead = (lead: any) => {
     setEditingLead(lead)
-    setIsEditModalOpen(true)
+    setIsAddLeadModalOpen(true) // Use the new simplified modal for editing
   }
 
-  const handleSaveEdit = (updatedLead: any) => {
-    console.log('Updating lead:', updatedLead)
-    
-    const updated = storageService.update('leads', editingLead.id, updatedLead)
-    if (updated) {
-      setLeadsList(prevLeads => 
-        prevLeads.map(lead => lead.id === editingLead.id ? updated : lead)
-      )
+  const handleSaveLead = async (leadData: any) => {
+    try {
+      const companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
+      
+      const leadToSave = {
+        account_id: leadData.account_id,
+        account_name: leadData.account_name,
+        contact_id: leadData.contact_id,
+        contact_name: leadData.contact_name,
+        department: leadData.department || '',
+        phone: leadData.phone,
+        email: leadData.email,
+        whatsapp: leadData.phone || leadData.whatsapp,
+        lead_source: leadData.lead_source,
+        product_id: leadData.product_id,
+        product_name: leadData.product_name,
+        lead_status: leadData.lead_status,
+        assigned_to: leadData.assigned_to,
+        lead_date: new Date().toISOString().split('T')[0],
+        priority: 'medium',
+        location: leadData.location || '',
+        city: leadData.city,
+        state: leadData.state,
+        country: leadData.country,
+        address: leadData.address,
+        buyer_ref: leadData.buyer_ref || '',
+        budget: leadData.budget,
+        quantity: leadData.quantity,
+        price_per_unit: leadData.price_per_unit,
+        expected_closing_date: leadData.expected_closing_date,
+        next_followup_date: leadData.next_followup_date,
+        notes: leadData.notes
+      }
+      
+      // Check if lead status is changing to "Qualified" (for deal creation)
+      const wasQualified = editingLead?.leadStatus === 'Qualified' || editingLead?.salesStage === 'Qualified'
+      const isNowQualified = leadData.lead_status === 'Qualified'
+      const shouldCreateDeal = editingLead && !wasQualified && isNowQualified
+      
+      let response
+      if (editingLead) {
+        // Update existing lead
+        response = await fetch('/api/leads', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            id: editingLead.id,
+            companyId,
+            ...leadToSave
+          })
+        })
+      } else {
+        // Create new lead
+        response = await fetch('/api/leads', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            companyId,
+            ...leadToSave
+          })
+        })
+      }
+
+      if (!response.ok) {
+        throw new Error(`Failed to ${editingLead ? 'update' : 'create'} lead`)
+      }
+
+      const savedLead = await response.json()
+      
+      // If lead was qualified, create a deal automatically
+      if (shouldCreateDeal) {
+        try {
+          await createDealFromLead(savedLead)
+        } catch (dealError) {
+          console.error('Error creating deal from qualified lead:', dealError)
+          // Don't fail the lead update if deal creation fails
+          toast({
+            title: "Warning",
+            description: "Lead updated but failed to create deal. Please create deal manually.",
+            variant: "destructive"
+          })
+        }
+      }
+      
+      // Transform API response to match UI format
+      const transformedLead = {
+        id: savedLead.id,
+        date: new Date(savedLead.lead_date).toLocaleDateString('en-GB'),
+        leadName: savedLead.account_name,
+        accountId: savedLead.account_id,
+        accountName: savedLead.account_name,
+        contactId: savedLead.contact_id,
+        contactName: savedLead.contact_name,
+        department: savedLead.department || '',
+        contactNo: savedLead.phone,
+        phone: savedLead.phone,
+        email: savedLead.email,
+        whatsapp: savedLead.whatsapp,
+        assignedTo: savedLead.assigned_to,
+        product: savedLead.product_name,
+        productId: savedLead.product_id,
+        leadSource: savedLead.lead_source,
+        salesStage: savedLead.lead_status,
+        leadStatus: savedLead.lead_status,
+        status: 'active',
+        priority: savedLead.priority || 'medium',
+        location: savedLead.location || '',
+        city: savedLead.city || '',
+        state: savedLead.state || '',
+        country: savedLead.country || '',
+        address: savedLead.address || '',
+        closingDate: savedLead.expected_closing_date || '',
+        buyerRef: savedLead.buyer_ref || '',
+        budget: savedLead.budget,
+        quantity: savedLead.quantity,
+        pricePerUnit: savedLead.price_per_unit,
+        expectedClosingDate: savedLead.expected_closing_date,
+        nextFollowupDate: savedLead.next_followup_date,
+        notes: savedLead.notes
+      }
+      
+      if (editingLead) {
+        setLeadsList(prevLeads => 
+          prevLeads.map(lead => lead.id === editingLead.id ? transformedLead : lead)
+        )
+        
+        if (shouldCreateDeal) {
+          toast({
+            title: "Success",
+            description: "Lead qualified and deal created successfully! Check the Deals tab."
+          })
+        } else {
+          toast({
+            title: "Success",
+            description: "Lead updated successfully"
+          })
+        }
+      } else {
+        setLeadsList(prevLeads => [transformedLead, ...prevLeads])
+        toast({
+          title: "Success",
+          description: "Lead created successfully"
+        })
+      }
       
       // Update stats
       loadLeads()
       
-      toast({
-        title: "Lead updated",
-        description: `Lead ${updated.leadName || updated.id} has been successfully updated.`
-      })
-    } else {
+      // Close modal
+      setIsAddLeadModalOpen(false)
+      setEditingLead(null)
+      
+    } catch (error) {
+      console.error('Error saving lead:', error)
       toast({
         title: "Error",
-        description: "Failed to update lead",
+        description: "Failed to save lead",
+        variant: "destructive"
+      })
+      throw error
+    }
+  }
+
+  const createDealFromLead = async (lead: any) => {
+    const dealData = {
+      deal_name: `${lead.account_name} - ${lead.product_name}`,
+      account_name: lead.account_name,
+      contact_person: lead.contact_name,
+      product: lead.product_name,
+      value: lead.budget || 0,
+      stage: 'Qualification',
+      probability: 25,
+      expected_close_date: lead.expected_closing_date,
+      assigned_to: lead.assigned_to,
+      priority: 'Medium',
+      status: 'Active',
+      source: lead.lead_source,
+      source_lead_id: lead.id,
+      last_activity: 'Created from qualified lead',
+      notes: `Converted from lead: ${lead.id}. Original notes: ${lead.notes || 'None'}`
+    }
+
+    const response = await fetch('/api/deals', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(dealData)
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to create deal from lead')
+    }
+
+    return response.json()
+  }
+
+  const handleExport = async () => {
+    try {
+      const success = await exportToExcel(filteredLeads, {
+        filename: `leads_${new Date().toISOString().split('T')[0]}`,
+        sheetName: 'Leads',
+        columns: [
+          { key: 'id', label: 'Lead ID', width: 12 },
+          { key: 'leadName', label: 'Company Name', width: 20 },
+          { key: 'contactName', label: 'Contact Person', width: 18 },
+          { key: 'contactNo', label: 'Contact Phone', width: 15 },
+          { key: 'email', label: 'Email', width: 25 },
+          { key: 'whatsapp', label: 'WhatsApp', width: 15 },
+          { key: 'city', label: 'City', width: 15 },
+          { key: 'state', label: 'State', width: 15 },
+          { key: 'location', label: 'Location', width: 20 },
+          { key: 'product', label: 'Product Interest', width: 25 },
+          { key: 'salesStage', label: 'Sales Stage', width: 15 },
+          { key: 'priority', label: 'Priority', width: 12 },
+          { key: 'assignedTo', label: 'Assigned To', width: 15 },
+          { key: 'closingDate', label: 'Closing Date', width: 15 },
+          { key: 'status', label: 'Status', width: 12 },
+          { key: 'date', label: 'Created Date', width: 15 }
+        ]
+      })
+      
+      if (success) {
+        toast({
+          title: "Export completed",
+          description: "Leads data has been exported to Excel file."
+        })
+      } else {
+        toast({
+          title: "Export failed",
+          description: "Failed to export leads data. Please try again.",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Export error:', error)
+      toast({
+        title: "Export failed",
+        description: "Failed to export leads data. Please try again.",
         variant: "destructive"
       })
     }
-    
-    setIsEditModalOpen(false)
-    setEditingLead(null)
   }
 
   return (
@@ -271,7 +554,7 @@ export function LeadsContent() {
           <p className="text-gray-600">Track and manage your sales leads effectively</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
@@ -279,7 +562,7 @@ export function LeadsContent() {
             <Upload className="w-4 h-4 mr-2" />
             Import Data
           </Button>
-          <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => router.push("/leads/add")}>
+          <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setIsAddLeadModalOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Add Lead
           </Button>
@@ -289,37 +572,68 @@ export function LeadsContent() {
       {/* Enhanced Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat) => (
-          <EnhancedCard key={stat.title} title={stat.title} value={stat.value} change={stat.change} icon={stat.icon} />
+          <EnhancedCard 
+            key={stat.title} 
+            title={stat.title} 
+            value={stat.value} 
+            change={stat.change} 
+            icon={stat.icon}
+            iconColor={stat.iconColor}
+            iconBg={stat.iconBg}
+          />
         ))}
       </div>
 
-      {/* Enhanced Leads Table */}
+      {/* Lead Search & Filters */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Lead Search & Filters</CardTitle>
+          <CardDescription>Filter and search through your leads</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Search leads by name, contact, or city..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10"
+              />
+            </div>
+            <Select value={selectedStage} onValueChange={setSelectedStage}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Stages</SelectItem>
+                <SelectItem value="New">New</SelectItem>
+                <SelectItem value="Contacted">Contacted</SelectItem>
+                <SelectItem value="Qualified">Qualified</SelectItem>
+                <SelectItem value="Disqualified">Disqualified</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={selectedAssignedTo} onValueChange={setSelectedAssignedTo}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Assigned</SelectItem>
+                {Array.from(new Set(leadsList.map(lead => lead.assignedTo).filter(Boolean))).map(assignedTo => (
+                  <SelectItem key={assignedTo} value={assignedTo}>{assignedTo}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Leads List Table */}
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>Recent Leads</CardTitle>
-              <CardDescription>Latest leads and their current status</CardDescription>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Filter className="w-4 h-4 text-gray-500" />
-              <Button
-                variant={leadFilter === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setLeadFilter("all")}
-                className={leadFilter === "all" ? "bg-gray-800 hover:bg-gray-900" : ""}
-              >
-                All Leads ({leadsList.length})
-              </Button>
-              <Button
-                variant={leadFilter === "active" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setLeadFilter("active")}
-                className={leadFilter === "active" ? "bg-green-600 hover:bg-green-700" : ""}
-              >
-                Active Leads ({leadsList.filter((lead) => lead.status === "active").length})
-              </Button>
-            </div>
+          <div>
+            <CardTitle>Leads List</CardTitle>
+            <CardDescription>Latest leads and their current status</CardDescription>
           </div>
         </CardHeader>
         <CardContent>
@@ -329,10 +643,12 @@ export function LeadsContent() {
                 key={lead.id}
                 className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
               >
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-14">
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                     <Users className="w-6 h-6 text-blue-600" />
                   </div>
+                  
+                  {/* Account Details */}
                   <div>
                     <div className="flex items-center space-x-2">
                       <h3 className="font-semibold">{lead.leadName}</h3>
@@ -344,9 +660,21 @@ export function LeadsContent() {
                         {lead.status}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-600">{lead.location}</p>
+                    {lead.department && lead.department !== "None" && (
+                      <p className="text-sm font-medium text-blue-600 mb-1">Department: {lead.department}</p>
+                    )}
+                    <p className="text-sm text-gray-600">
+                      {lead.city && lead.state ? `${lead.city}, ${lead.state}` : 
+                       lead.city ? lead.city : 
+                       lead.state ? lead.state : 
+                       lead.location || 'Location not specified'}
+                    </p>
+                  </div>
+                  
+                  {/* Contact Details - Just beside account */}
+                  <div className="ml-14">
                     <div className="text-xs text-gray-500 space-y-1">
-                      <p>Contact: {lead.contactName}</p>
+                      <p className="font-medium">Contact: {lead.contactName}</p>
                       {lead.contactNo && (
                         <div className="flex items-center">
                           <Phone className="w-3 h-3 mr-1" />
@@ -361,19 +689,25 @@ export function LeadsContent() {
                       )}
                     </div>
                   </div>
+                  
+                  {/* Product Details - beside contact */}
+                  <div className="ml-14">
+                    <div className="flex items-start gap-x-14">
+                      <p className="text-sm font-medium">{lead.product}</p>
+                      <div className="text-xs text-gray-500">
+                        <p>Stage: {lead.leadStatus || lead.salesStage}</p>
+                        <p>Assigned to: {lead.assignedTo}</p>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500 space-y-1 mt-1">
+                      {lead.quantity && <p>Quantity: {lead.quantity}</p>}
+                      {lead.pricePerUnit && <p>Price/Unit: ₹{lead.pricePerUnit}</p>}
+                      {lead.budget && <p>Budget: ₹{lead.budget}</p>}
+                    </div>
+                  </div>
                 </div>
+                
                 <div className="flex items-center space-x-4">
-                  <div className="text-right">
-                    <p className="text-sm font-medium">{lead.product}</p>
-                    <p className="text-xs text-gray-500">Assigned to: {lead.assignedTo}</p>
-                  </div>
-                  <div className="text-center">
-                    <AILeadScore lead={lead as LeadData} />
-                  </div>
-                  <StatusIndicator
-                    status={lead.priority}
-                    variant={lead.priority === "high" ? "error" : lead.priority === "medium" ? "warning" : "success"}
-                  />
                   <div className="flex space-x-1">
                     {/* Communication Buttons */}
                     {lead.contactNo && (
@@ -644,6 +978,17 @@ export function LeadsContent() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Add/Edit Lead Modal - Simplified Version */}
+      <AddLeadModalSimplified
+        isOpen={isAddLeadModalOpen}
+        onClose={() => {
+          setIsAddLeadModalOpen(false)
+          setEditingLead(null)
+        }}
+        onSave={handleSaveLead}
+        editingLead={editingLead}
+      />
     </div>
   )
 }

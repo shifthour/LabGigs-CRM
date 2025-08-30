@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     account_type TEXT CHECK (account_type IN ('Customer', 'Prospect', 'Partner', 'Competitor', 'Vendor', 'Other')),
     website TEXT,
     phone TEXT,
+    address TEXT,
     description TEXT,
     
     -- Address fields (billing)

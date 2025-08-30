@@ -17,6 +17,8 @@ interface EnhancedCardProps extends React.ComponentProps<typeof Card> {
     period?: string
   }
   icon?: React.ComponentType<{ className?: string }>
+  iconColor?: string
+  iconBg?: string
   actions?: React.ReactNode
   trend?: "up" | "down" | "neutral"
 }
@@ -27,6 +29,8 @@ export function EnhancedCard({
   value,
   change,
   icon: Icon,
+  iconColor,
+  iconBg,
   actions,
   trend,
   className,
@@ -41,8 +45,14 @@ export function EnhancedCard({
         </div>
         <div className="flex items-center space-x-2">
           {Icon && (
-            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Icon className="h-4 w-4 text-primary" />
+            <div className={cn(
+              "h-8 w-8 rounded-lg flex items-center justify-center",
+              iconBg || "bg-primary/10"
+            )}>
+              <Icon className={cn(
+                "h-4 w-4",
+                iconColor || "text-primary"
+              )} />
             </div>
           )}
           {actions && (

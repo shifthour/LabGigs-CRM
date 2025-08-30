@@ -69,7 +69,7 @@ const roleBasedNavigation = {
         { name: "Leads", href: "/leads", icon: UserCheck, badge: "298" },
         { name: "Contacts", href: "/contacts", icon: Contact, badge: "1.2K" },
         { name: "Accounts", href: "/accounts", icon: Building2, badge: "3.9K" },
-        { name: "Deals", href: "/opportunities", icon: Handshake, badge: "15" },
+        { name: "Deals", href: "/deals", icon: Handshake, badge: "15" },
       ]
     },
     {
@@ -191,7 +191,7 @@ const roleBasedNavigation = {
         { name: "Leads", href: "/leads", icon: UserCheck, badge: "298" },
         { name: "Contacts", href: "/contacts", icon: Contact, badge: "1.2K" },
         { name: "Accounts", href: "/accounts", icon: Building2, badge: "3.9K" },
-        { name: "Deals", href: "/opportunities", icon: Handshake, badge: "15" },
+        { name: "Deals", href: "/deals", icon: Handshake, badge: "15" },
       ]
     },
     {
@@ -304,7 +304,7 @@ const roleBasedNavigation = {
         { name: "Leads", href: "/leads", icon: UserCheck, badge: "45" },
         { name: "Contacts", href: "/contacts", icon: Contact, badge: "234" },
         { name: "Accounts", href: "/accounts", icon: Building2, badge: "234" },
-        { name: "Deals", href: "/opportunities", icon: Handshake, badge: "8" },
+        { name: "Deals", href: "/deals", icon: Handshake, badge: "8" },
       ]
     },
     {
@@ -345,7 +345,7 @@ const roleBasedNavigation = {
         { name: "Leads", href: "/leads", icon: UserCheck, badge: "298" },
         { name: "Contacts", href: "/contacts", icon: Contact, badge: "1.2K" },
         { name: "Accounts", href: "/accounts", icon: Building2, badge: "3.9K" },
-        { name: "Deals", href: "/opportunities", icon: Handshake, badge: "15" },
+        { name: "Deals", href: "/deals", icon: Handshake, badge: "15" },
       ]
     },
     {
@@ -403,6 +403,8 @@ const roleBasedNavigation = {
 export function RoleBasedSidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const [navigationStats, setNavigationStats] = useState<any>(null)
+  const [statsLoaded, setStatsLoaded] = useState(false)
   const pathname = usePathname()
   
   // Get current user from localStorage
@@ -413,9 +415,101 @@ export function RoleBasedSidebar() {
     }
   }, [])
   
+  // Load navigation stats with caching
+  useEffect(() => {
+    loadNavigationStats()
+  }, [])
+  
+  const loadNavigationStats = async (forceRefresh = false) => {
+    try {
+      const companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
+      
+      // Check cache first (unless forcing refresh)
+      if (!forceRefresh) {
+        const cachedStats = localStorage.getItem(`navigation-stats-${companyId}`)
+        const cacheTime = localStorage.getItem(`navigation-stats-time-${companyId}`)
+        
+        if (cachedStats && cacheTime) {
+          const cacheAge = Date.now() - parseInt(cacheTime)
+          const fiveMinutes = 5 * 60 * 1000
+          
+          if (cacheAge < fiveMinutes) {
+            // Use cached data immediately
+            setNavigationStats(JSON.parse(cachedStats))
+            setStatsLoaded(true)
+            return
+          }
+        }
+      }
+      
+      // Fetch fresh data
+      const response = await fetch(`/api/navigation-stats?companyId=${companyId}`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        setNavigationStats(data.stats)
+        setStatsLoaded(true)
+        
+        // Cache the results
+        localStorage.setItem(`navigation-stats-${companyId}`, JSON.stringify(data.stats))
+        localStorage.setItem(`navigation-stats-time-${companyId}`, Date.now().toString())
+      }
+    } catch (error) {
+      console.error('Error loading navigation stats:', error)
+      setStatsLoaded(true) // Show UI even if stats fail
+    }
+  }
+  
+  // Expose refresh function globally for other components to trigger
+  useEffect(() => {
+    window.refreshNavigationStats = () => loadNavigationStats(true)
+    return () => {
+      delete window.refreshNavigationStats
+    }
+  }, [])
+  
+  const formatCount = (count: number) => {
+    if (count >= 1000) {
+      return `${(count / 1000).toFixed(1)}K`
+    }
+    return count.toString()
+  }
+  
+  const getBadge = (routePath: string) => {
+    if (!statsLoaded) return "..." // Show loading state
+    
+    switch (routePath) {
+      case "/leads": return navigationStats?.leads ? formatCount(navigationStats.leads) : "0"
+      case "/contacts": return navigationStats?.contacts ? formatCount(navigationStats.contacts) : "0"
+      case "/accounts": return navigationStats?.accounts ? formatCount(navigationStats.accounts) : "0"
+      case "/deals": return navigationStats?.deals ? formatCount(navigationStats.deals) : "0"
+      case "/products": return navigationStats?.products ? formatCount(navigationStats.products) : "0"
+      case "/quotations": return navigationStats?.quotations ? formatCount(navigationStats.quotations) : "0"
+      case "/sales-orders": return navigationStats?.salesOrders ? formatCount(navigationStats.salesOrders) : "0"
+      case "/installations": return navigationStats?.installations ? formatCount(navigationStats.installations) : "0"
+      case "/amc": return navigationStats?.amc ? formatCount(navigationStats.amc) : "0"
+      case "/complaints": return navigationStats?.complaints ? formatCount(navigationStats.complaints) : "0"
+      default: return null
+    }
+  }
+  
   // Use current user's role, fallback to Sales Manager
   const currentRole = currentUser?.role?.name?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || "Sales Manager"
   let navigation = roleBasedNavigation[currentRole] || roleBasedNavigation["Sales Manager"] || []
+  
+  // Update navigation with real counts using getBadge function
+  navigation = navigation.map(item => {
+    if (item.type === "category" && item.children) {
+      return {
+        ...item,
+        children: item.children.map(child => ({
+          ...child,
+          badge: getBadge(child.href) || child.badge
+        }))
+      }
+    }
+    return item
+  })
   
   // Update admin links based on user type
   if (currentUser?.is_admin || currentUser?.is_super_admin) {

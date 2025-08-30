@@ -26,8 +26,7 @@ export async function GET(request: NextRequest) {
       .from('accounts')
       .select(`
         *,
-        owner:owner_id(id, full_name, email),
-        parent_account:parent_account_id(id, account_name)
+        owner:owner_id(id, full_name, email)
       `, { count: 'exact' })
       .eq('company_id', companyId)
       .order('created_at', { ascending: false })
@@ -79,17 +78,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Account name is required' }, { status: 400 })
     }
     
-    // Check for duplicate
+    // Check for duplicate (same name AND city)
     const { data: existing } = await supabase
       .from('accounts')
       .select('id')
       .eq('company_id', companyId)
       .eq('account_name', accountData.account_name)
+      .eq('billing_city', accountData.billing_city || '')
       .single()
     
     if (existing) {
       return NextResponse.json({ 
-        error: 'An account with this name already exists' 
+        error: `An account with name "${accountData.account_name}" already exists in ${accountData.billing_city || 'this city'}` 
       }, { status: 400 })
     }
     

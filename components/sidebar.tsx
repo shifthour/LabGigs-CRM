@@ -2,7 +2,7 @@
 
 // Updated sidebar with categorized navigation
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -36,59 +36,131 @@ import {
   ChevronUp,
 } from "lucide-react"
 
-const navigation = [
-  { name: "Dashboard", href: "/", icon: Home, badge: null, type: "item" },
-  {
-    name: "Sales",
-    icon: Target,
-    type: "category",
-    children: [
-      { name: "Leads", href: "/leads", icon: UserCheck, badge: "298" },
-      { name: "Accounts", href: "/accounts", icon: Building2, badge: "3.9K" },
-      { name: "Opportunities", href: "/opportunities", icon: Target, badge: "15" },
-      { name: "Quotations", href: "/quotations", icon: FileText, badge: "12" },
-      { name: "Sales Orders", href: "/sales-orders", icon: ShoppingCart, badge: "23" },
-    ]
-  },
-  {
-    name: "Operations",
-    icon: Wrench,
-    type: "category",
-    children: [
-      { name: "Installations", href: "/installations", icon: Wrench, badge: "8" },
-      { name: "AMC", href: "/amc", icon: Calendar, badge: "89" },
-      { name: "Complaints", href: "/complaints", icon: AlertTriangle, badge: "23" },
-      { name: "Activities", href: "/activities", icon: Activity, badge: "45" },
-    ]
-  },
-  {
-    name: "Management",
-    icon: Package,
-    type: "category",
-    children: [
-      { name: "Products", href: "/products", icon: Package, badge: "2K+" },
-      { name: "Solutions", href: "/solutions", icon: Beaker, badge: "12" },
-      { name: "Doc Library", href: "/doc-library", icon: FolderOpen, badge: "270" },
-      { name: "MIS Reports", href: "/mis-reports", icon: BarChart3, badge: null },
-    ]
-  },
-  {
-    name: "Communication",
-    icon: MessageSquare,
-    type: "category",
-    children: [
-      { name: "Conversations", href: "/conversations", icon: MessageSquare, badge: "47" },
-      { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: "156" },
-    ]
-  },
-  { name: "Integrations", href: "/integrations", icon: Zap, badge: "8", type: "item" },
-  { name: "Admin", href: "/admin", icon: Settings, badge: null, type: "item" },
-]
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState<string[]>(["Sales"])
+  const [navigationStats, setNavigationStats] = useState<any>(null)
+  const [statsLoaded, setStatsLoaded] = useState(false)
   const pathname = usePathname()
+  
+  // Load navigation stats with caching
+  useEffect(() => {
+    loadNavigationStats()
+  }, [])
+  
+  const loadNavigationStats = async () => {
+    try {
+      const companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
+      
+      // Check cache first
+      const cachedStats = localStorage.getItem(`navigation-stats-${companyId}`)
+      const cacheTime = localStorage.getItem(`navigation-stats-time-${companyId}`)
+      
+      if (cachedStats && cacheTime) {
+        const cacheAge = Date.now() - parseInt(cacheTime)
+        const fiveMinutes = 5 * 60 * 1000
+        
+        if (cacheAge < fiveMinutes) {
+          // Use cached data immediately
+          setNavigationStats(JSON.parse(cachedStats))
+          setStatsLoaded(true)
+          return
+        }
+      }
+      
+      // Fetch fresh data
+      const response = await fetch(`/api/navigation-stats?companyId=${companyId}`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        setNavigationStats(data.stats)
+        setStatsLoaded(true)
+        
+        // Cache the results for 5 minutes
+        localStorage.setItem(`navigation-stats-${companyId}`, JSON.stringify(data.stats))
+        localStorage.setItem(`navigation-stats-time-${companyId}`, Date.now().toString())
+      }
+    } catch (error) {
+      console.error('Error loading navigation stats:', error)
+      setStatsLoaded(true) // Show UI even if stats fail
+    }
+  }
+  
+  const formatCount = (count: number) => {
+    if (count >= 1000) {
+      return `${(count / 1000).toFixed(1)}K`
+    }
+    return count.toString()
+  }
+  
+  const getBadge = (routePath: string) => {
+    if (!statsLoaded) return "..." // Show loading dots
+    
+    switch (routePath) {
+      case "/leads": return navigationStats?.leads ? formatCount(navigationStats.leads) : "0"
+      case "/accounts": return navigationStats?.accounts ? formatCount(navigationStats.accounts) : "0"
+      case "/deals": return navigationStats?.deals ? formatCount(navigationStats.deals) : "0"
+      case "/products": return navigationStats?.products ? formatCount(navigationStats.products) : "0"
+      case "/quotations": return navigationStats?.quotations ? formatCount(navigationStats.quotations) : "0"
+      case "/sales-orders": return navigationStats?.salesOrders ? formatCount(navigationStats.salesOrders) : "0"
+      case "/installations": return navigationStats?.installations ? formatCount(navigationStats.installations) : "0"
+      case "/amc": return navigationStats?.amc ? formatCount(navigationStats.amc) : "0"
+      case "/complaints": return navigationStats?.complaints ? formatCount(navigationStats.complaints) : "0"
+      case "/activities": return navigationStats?.activities ? formatCount(navigationStats.activities) : "0"
+      default: return null
+    }
+  }
+
+  // Create navigation with dynamic badges
+  const navigation = [
+    { name: "Dashboard", href: "/", icon: Home, badge: null, type: "item" },
+    {
+      name: "Sales",
+      icon: Target,
+      type: "category",
+      children: [
+        { name: "Leads", href: "/leads", icon: UserCheck, badge: getBadge("/leads") },
+        { name: "Accounts", href: "/accounts", icon: Building2, badge: getBadge("/accounts") },
+        { name: "Deals", href: "/deals", icon: Target, badge: getBadge("/deals") },
+        { name: "Quotations", href: "/quotations", icon: FileText, badge: getBadge("/quotations") },
+        { name: "Sales Orders", href: "/sales-orders", icon: ShoppingCart, badge: getBadge("/sales-orders") },
+      ]
+    },
+    {
+      name: "Operations",
+      icon: Wrench,
+      type: "category",
+      children: [
+        { name: "Installations", href: "/installations", icon: Wrench, badge: getBadge("/installations") },
+        { name: "AMC", href: "/amc", icon: Calendar, badge: getBadge("/amc") },
+        { name: "Complaints", href: "/complaints", icon: AlertTriangle, badge: getBadge("/complaints") },
+        { name: "Activities", href: "/activities", icon: Activity, badge: getBadge("/activities") },
+      ]
+    },
+    {
+      name: "Management",
+      icon: Package,
+      type: "category",
+      children: [
+        { name: "Products", href: "/products", icon: Package, badge: getBadge("/products") },
+        { name: "Solutions", href: "/solutions", icon: Beaker, badge: "12" },
+        { name: "Doc Library", href: "/doc-library", icon: FolderOpen, badge: "270" },
+        { name: "MIS Reports", href: "/mis-reports", icon: BarChart3, badge: null },
+      ]
+    },
+    {
+      name: "Communication",
+      icon: MessageSquare,
+      type: "category",
+      children: [
+        { name: "Conversations", href: "/conversations", icon: MessageSquare, badge: "47" },
+        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: "156" },
+      ]
+    },
+    { name: "Integrations", href: "/integrations", icon: Zap, badge: "8", type: "item" },
+    { name: "Admin", href: "/admin", icon: Settings, badge: null, type: "item" },
+  ]
 
   const toggleCategory = (categoryName: string) => {
     setExpandedCategories(prev => 

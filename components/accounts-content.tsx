@@ -4,24 +4,34 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Download, Edit, Phone, Mail, Building2, Upload, Save, X, Trash2 } from "lucide-react"
-import { DataImportModal } from "@/components/data-import-modal"
+import { Plus, Search, Download, Edit, Phone, Mail, Building2, Upload, Save, X, Trash2, Users, CheckCircle, Factory, Globe } from "lucide-react"
+import { exportToExcel, formatDateForExcel } from "@/lib/excel-export"
+import { SimpleFileImport } from "@/components/simple-file-import"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import storageService from "@/lib/localStorage-service"
+
+// Custom WhatsApp Icon Component
+const WhatsAppIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.669.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.569-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893A11.821 11.821 0 0020.465 3.516"/>
+  </svg>
+)
 
 interface Account {
   id: string
   accountName: string
   city?: string
   state?: string
-  region?: string
+  country?: string
   area?: string
+  address?: string
+  billing_street?: string
   contactName?: string
   contactNo?: string
   email?: string
@@ -29,34 +39,40 @@ interface Account {
   assignedTo?: string
   industry?: string
   status?: string
-  turnover?: string
-  employees?: string
   createdAt?: string
   updatedAt?: string
   lastActivity?: string
 }
 
-const regions = ["All", "North", "South", "East", "West", "Central", "International"]
 const industries = ["All", "Biotech Company", "Dealer", "Educational Institutions", "Food and Beverages", "Hair Transplant Clinics/ Hospitals", "Molecular Diagnostics", "Pharmaceutical", "Research", "SRO", "Training Institute", "Universities"]
-const statuses = ["All", "Active", "Inactive", "Prospect", "Dormant"]
+const statuses = ["All", "Active", "Inactive"]
+const countries = ["All", "India", "USA", "UK", "Canada", "Australia", "Germany", "France", "Japan", "Singapore", "UAE", "Other"]
 
 export function AccountsContent() {
   const router = useRouter()
   const { toast } = useToast()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedRegion, setSelectedRegion] = useState("All")
+  const [selectedCountry, setSelectedCountry] = useState("All")
   const [selectedIndustry, setSelectedIndustry] = useState("All")
   const [selectedStatus, setSelectedStatus] = useState("All")
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false)
   const [isEditAccountOpen, setIsEditAccountOpen] = useState(false)
   const [editingAccount, setEditingAccount] = useState<Account | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 })
+  const [isSaving, setIsSaving] = useState(false)
+  const [isLoadingStats, setIsLoadingStats] = useState(true)
   const [accountStats, setAccountStats] = useState({
     total: 0,
     active: 0,
     newThisMonth: 0,
-    activeRegions: 0
+    activeRegions: 0,
+    mostActiveIndustry: 'N/A',
+    mostActiveIndustryCount: 0,
+    mostActiveCountry: 'N/A',
+    mostActiveCountryCount: 0
   })
 
   // Form state for add/edit
@@ -67,18 +83,31 @@ export function AccountsContent() {
     contactNo: "",
     email: "",
     website: "",
+    address: "",
     city: "",
     state: "",
-    region: "",
+    country: "",
     assignedTo: "",
-    status: "Active",
-    turnover: "",
-    employees: ""
+    status: "Active"
   })
 
   // Load accounts from Supabase API
   useEffect(() => {
     loadAccountsFromAPI()
+  }, [])
+
+  // Reload accounts when the page becomes visible (user switches back to tab)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadAccountsFromAPI()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   const loadAccountsFromAPI = async () => {
@@ -98,14 +127,16 @@ export function AccountsContent() {
       
       console.log("Loading accounts for company:", user.company_id)
       
-      // Fetch accounts from API
-      const response = await fetch(`/api/accounts?companyId=${user.company_id}&limit=100`)
+      // Fetch accounts from API with cache busting
+      const response = await fetch(`/api/accounts?companyId=${user.company_id}&limit=1000&_t=${Date.now()}`)
       if (!response.ok) {
         throw new Error(`Failed to fetch accounts: ${response.status}`)
       }
       
       const data = await response.json()
       console.log("API Response:", data)
+      console.log("Number of accounts from API:", data.accounts?.length || 0)
+      console.log("Total count from API:", data.total)
       
       // Map API data to component format
       const mappedAccounts = (data.accounts || []).map((account: any) => ({
@@ -113,12 +144,14 @@ export function AccountsContent() {
         accountName: account.account_name,
         city: account.billing_city,
         state: account.billing_state,
-        region: account.billing_state, // Use state as region for now
-        contactName: account.owner?.full_name,
+        country: account.billing_country || account.country || 'India',
+        address: account.address,
+        billing_street: account.billing_street,
+        contactName: account.contact_name || '',
         contactNo: account.phone,
-        email: account.owner?.email,
+        email: account.email,
         website: account.website,
-        assignedTo: account.owner?.full_name,
+        assignedTo: account.assigned_to || account.owner?.full_name || '',
         industry: account.industry,
         status: account.status || 'Active',
         createdAt: account.created_at
@@ -129,14 +162,57 @@ export function AccountsContent() {
       
       // Calculate stats from API data
       const activeAccounts = mappedAccounts.filter((acc: any) => acc.status === 'Active').length
-      const uniqueRegions = [...new Set(mappedAccounts.filter((acc: any) => acc.region).map((acc: any) => acc.region))].length
+      const uniqueCountries = [...new Set(mappedAccounts.filter((acc: any) => acc.country).map((acc: any) => acc.country))].length
+      
+      // Calculate new accounts this month
+      const currentDate = new Date()
+      const currentMonth = currentDate.getMonth()
+      const currentYear = currentDate.getFullYear()
+      
+      const newThisMonth = mappedAccounts.filter((acc: any) => {
+        if (!acc.createdAt) return false
+        const createdDate = new Date(acc.createdAt)
+        return createdDate.getMonth() === currentMonth && createdDate.getFullYear() === currentYear
+      }).length
+
+      // Calculate most active industry
+      const industryCount = mappedAccounts.reduce((acc: any, account: any) => {
+        if (account.industry && account.industry.trim()) {
+          acc[account.industry] = (acc[account.industry] || 0) + 1
+        }
+        return acc
+      }, {})
+      
+      const mostActiveIndustry = Object.keys(industryCount).length > 0 
+        ? Object.keys(industryCount).reduce((a, b) => industryCount[a] > industryCount[b] ? a : b)
+        : 'N/A'
+      const mostActiveIndustryCount = industryCount[mostActiveIndustry] || 0
+
+      // Calculate most active country
+      const countryCount = mappedAccounts.reduce((acc: any, account: any) => {
+        if (account.country && account.country.trim()) {
+          acc[account.country] = (acc[account.country] || 0) + 1
+        }
+        return acc
+      }, {})
+      
+      const mostActiveCountry = Object.keys(countryCount).length > 0 
+        ? Object.keys(countryCount).reduce((a, b) => countryCount[a] > countryCount[b] ? a : b)
+        : 'N/A'
+      const mostActiveCountryCount = countryCount[mostActiveCountry] || 0
       
       setAccountStats({
         total: data.total || mappedAccounts.length,
         active: activeAccounts,
-        newThisMonth: 0, // TODO: Calculate from created dates
-        activeRegions: uniqueRegions
+        newThisMonth: newThisMonth,
+        activeRegions: uniqueCountries,
+        mostActiveIndustry: mostActiveIndustry,
+        mostActiveIndustryCount: mostActiveIndustryCount,
+        mostActiveCountry: mostActiveCountry,
+        mostActiveCountryCount: mostActiveCountryCount
       })
+      
+      setIsLoadingStats(false)
       
     } catch (error) {
       console.error("Error loading accounts:", error)
@@ -160,11 +236,11 @@ export function AccountsContent() {
       account.contactName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       account.city?.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesRegion = selectedRegion === "All" || account.region === selectedRegion
+    const matchesCountry = selectedCountry === "All" || account.country === selectedCountry
     const matchesIndustry = selectedIndustry === "All" || account.industry === selectedIndustry
     const matchesStatus = selectedStatus === "All" || account.status === selectedStatus
 
-    return matchesSearch && matchesRegion && matchesIndustry && matchesStatus
+    return matchesSearch && matchesCountry && matchesIndustry && matchesStatus
   })
 
   const handleAddAccount = () => {
@@ -177,50 +253,56 @@ export function AccountsContent() {
       website: "",
       city: "",
       state: "",
-      region: "",
+      country: "",
       assignedTo: "",
-      status: "Active",
-      turnover: "",
-      employees: ""
+      status: "Active"
     })
     setIsAddAccountOpen(true)
   }
 
   const handleEditAccount = (account: Account) => {
     setEditingAccount(account)
-    setFormData(account)
+    // Map billing_street to address for the form
+    setFormData({
+      ...account,
+      address: account.billing_street || account.address || ''
+    })
     setIsEditAccountOpen(true)
   }
 
-  const handleDeleteAccount = (id: string) => {
+  const handleDeleteAccount = async (id: string) => {
     if (confirm("Are you sure you want to delete this account?")) {
-      const success = storageService.delete('accounts', id)
-      if (success) {
-        // Immediately remove from state
-        setAccounts(prevAccounts => prevAccounts.filter(acc => acc.id !== id))
-        
-        // Update stats
-        const stats = storageService.getStats('accounts')
-        const storedAccounts = storageService.getAll<Account>('accounts')
-        const activeAccounts = storedAccounts.filter(acc => acc.status === 'Active').length
-        const uniqueRegions = [...new Set(storedAccounts.filter(acc => acc.region).map(acc => acc.region))].length
-        
-        setAccountStats({
-          total: stats.total,
-          active: activeAccounts,
-          newThisMonth: stats.thisMonthCount,
-          activeRegions: uniqueRegions
+      try {
+        const response = await fetch(`/api/accounts?id=${id}`, {
+          method: 'DELETE',
         })
         
+        if (response.ok) {
+          // Immediately remove from state
+          setAccounts(prevAccounts => prevAccounts.filter(acc => acc.id !== id))
+          
+          // Reload accounts from API to get updated stats
+          await loadAccountsFromAPI()
+          
+          toast({
+            title: "Account deleted",
+            description: "The account has been successfully deleted."
+          })
+        } else {
+          throw new Error("Failed to delete account")
+        }
+      } catch (error) {
+        console.error("Error deleting account:", error)
         toast({
-          title: "Account deleted",
-          description: "The account has been successfully deleted."
+          title: "Error",
+          description: "Failed to delete account",
+          variant: "destructive"
         })
       }
     }
   }
 
-  const handleSaveAccount = () => {
+  const handleSaveAccount = async () => {
     console.log("handleSaveAccount called with formData:", formData)
     
     if (!formData.accountName) {
@@ -232,85 +314,8 @@ export function AccountsContent() {
       return
     }
 
-    if (editingAccount) {
-      // Update existing account
-      const updatedAccount = storageService.update('accounts', editingAccount.id, formData)
-      console.log("Updated account:", updatedAccount)
-      if (updatedAccount) {
-        // Immediately update the state
-        setAccounts(prevAccounts => {
-          const newAccounts = prevAccounts.map(acc => acc.id === editingAccount.id ? updatedAccount : acc)
-          console.log("Setting updated accounts:", newAccounts)
-          return newAccounts
-        })
-        toast({
-          title: "Account updated",
-          description: "The account has been successfully updated."
-        })
-        setIsEditAccountOpen(false)
-        setEditingAccount(null)
-      }
-    } else {
-      // Create new account
-      console.log("Creating new account...")
-      const newAccount = storageService.create('accounts', formData as Account)
-      console.log("New account created:", newAccount)
-      
-      if (newAccount) {
-        // Force immediate refresh from localStorage
-        const refreshedAccounts = storageService.getAll<Account>('accounts')
-        console.log("Force refresh - all accounts:", refreshedAccounts)
-        setAccounts(refreshedAccounts)
-        
-        toast({
-          title: "Account created",
-          description: "The account has been successfully created."
-        })
-        setIsAddAccountOpen(false)
-      } else {
-        console.error("Failed to create account")
-        toast({
-          title: "Error",
-          description: "Failed to create account",
-          variant: "destructive"
-        })
-      }
-    }
-    
-    // Reload stats
-    const stats = storageService.getStats('accounts')
-    const storedAccounts = storageService.getAll<Account>('accounts')
-    const activeAccounts = storedAccounts.filter(acc => acc.status === 'Active').length
-    
-    const uniqueRegions = [...new Set(storedAccounts.filter(acc => acc.region).map(acc => acc.region))].length
-    console.log("Updated stats:", { total: stats.total, active: activeAccounts, regions: uniqueRegions })
-    
-    setAccountStats({
-      total: stats.total,
-      active: activeAccounts,
-      newThisMonth: stats.thisMonthCount,
-      activeRegions: uniqueRegions
-    })
-    
-    // Reset form
-    setFormData({
-      accountName: "",
-      industry: "",
-      contactName: "",
-      contactNo: "",
-      email: "",
-      website: "",
-      city: "",
-      state: "",
-      region: "",
-      assignedTo: "",
-      status: "Active",
-      turnover: "",
-      employees: ""
-    })
-  }
+    setIsSaving(true)
 
-  const handleImportData = async (data: any[]) => {
     try {
       // Get current user's company ID
       const storedUser = localStorage.getItem('user')
@@ -332,31 +337,203 @@ export function AccountsContent() {
         })
         return
       }
+
+      if (editingAccount) {
+        // Update existing account
+        console.log("Updating existing account...")
+        const response = await fetch('/api/accounts', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: editingAccount.id,
+            account_name: formData.accountName,
+            industry: formData.industry,
+            phone: formData.contactNo,
+            email: formData.email,
+            website: formData.website,
+            billing_street: formData.address,
+            billing_city: formData.city,
+            billing_state: formData.state,
+            billing_country: formData.country || 'India',
+            status: formData.status || 'Active',
+            contact_name: formData.contactName,
+            assigned_to: formData.assignedTo,
+            owner_id: user.id
+          })
+        })
+        
+        if (response.ok) {
+          toast({
+            title: "Account updated",
+            description: "The account has been successfully updated."
+          })
+          setIsEditAccountOpen(false)
+          setEditingAccount(null)
+          
+          // Add slight delay to ensure database is updated, then reload and route
+          setTimeout(async () => {
+            await loadAccountsFromAPI()
+            router.push('/accounts')
+          }, 500)
+        } else {
+          throw new Error("Failed to update account")
+        }
+      } else {
+        // Create new account
+        console.log("Creating new account...")
+        const response = await fetch('/api/accounts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            companyId: user.company_id,
+            account_name: formData.accountName,
+            industry: formData.industry,
+            phone: formData.contactNo,
+            email: formData.email,
+            website: formData.website,
+            billing_street: formData.address,
+            billing_city: formData.city,
+            billing_state: formData.state,
+            billing_country: formData.country || 'India',
+            status: formData.status || 'Active',
+            contact_name: formData.contactName,
+            assigned_to: formData.assignedTo,
+            owner_id: user.id
+          })
+        })
+        
+        if (response.ok) {
+          toast({
+            title: "Account created",
+            description: "The account has been successfully created."
+          })
+          setIsAddAccountOpen(false)
+          
+          // Reset form
+          setFormData({
+            accountName: "",
+            industry: "",
+            contactName: "",
+            contactNo: "",
+            email: "",
+            website: "",
+            address: "",
+            city: "",
+            state: "",
+            country: "",
+            assignedTo: "",
+            status: "Active"
+          })
+          
+          // Add slight delay to ensure database is updated, then reload and route
+          setTimeout(async () => {
+            await loadAccountsFromAPI()
+            router.push('/accounts')
+          }, 500)
+        } else {
+          throw new Error("Failed to create account")
+        }
+      }
       
-      // Prepare accounts for import
-      const accountsToImport = data.map(item => ({
-        account_name: item.accountName || item.leadName || item.name || '',
-        industry: item.industry || '',
-        phone: item.phone || item.contactNo || '',
-        website: item.website || '',
-        billing_city: item.city || '',
-        billing_state: item.state || '',
-        billing_country: item.country || '',
-        status: item.status || 'Active',
-        owner_id: user.id
-      }))
+    } catch (error) {
+      console.error("Error saving account:", error)
+      toast({
+        title: "Error",
+        description: editingAccount ? "Failed to update account" : "Failed to create account",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleImportData = async (data: any[]) => {
+    try {
+      // Set loading state
+      setIsImporting(true)
+      setImportProgress({ current: 0, total: data.length })
+      
+      // Get current user's company ID
+      const storedUser = localStorage.getItem('user')
+      if (!storedUser) {
+        toast({
+          title: "Error",
+          description: "User not found. Please login again.",
+          variant: "destructive"
+        })
+        setIsImporting(false)
+        return
+      }
+      
+      const user = JSON.parse(storedUser)
+      if (!user.company_id) {
+        toast({
+          title: "Error",
+          description: "Company not found. Please login again.",
+          variant: "destructive"
+        })
+        setIsImporting(false)
+        return
+      }
+      
+      console.log("Starting import of", data.length, "records")
+      console.log("Sample data item:", data[0])
+      
+      // Show initial toast
+      toast({
+        title: "Import started",
+        description: `Processing ${data.length} records...`
+      })
+      
+      // Prepare accounts for import - flexible field mapping
+      const accountsToImport = data.map(item => {
+        // Try multiple possible field names for account name
+        const accountName = item.accountName || item['Account Name'] || item.account_name || 
+                           item.leadName || item['Lead Name'] || item.lead_name ||
+                           item.name || item.Name || item.companyName || item['Company Name'] || ''
+        
+        return {
+          account_name: accountName,
+          industry: item.industry || item.Industry || '',
+          phone: item['Contact Phone'] || item.contactPhone || item.phone || item.Phone || item.contactNo || item['Contact Number'] || item.contact_no || '',
+          email: item.email || item.Email || item['Email Address'] || item.emailAddress || item.contact_email || '',
+          website: item.website || item.Website || '',
+          billing_street: item.address || item.Address || item['Full Address'] || item.fullAddress || '',
+          billing_city: item.city || item.City || item.billing_city || '',
+          billing_state: item.state || item.State || item.billing_state || '',
+          billing_country: item.country || item.Country || item.billing_country || 'India',
+          status: 'Active', // Default status since we removed it from template
+          contact_name: item.contactName || item['Contact Name'] || item.contact_name || item['Contact Person'] || '',
+          assigned_to: item['Assigned To'] || item.assignedTo || item.assigned_to || item['Assigned to'] || item.owner || item.Owner || '',
+          owner_id: user.id
+        }
+      })
       
       let successCount = 0
       let failCount = 0
       
-      // Import accounts one by one (or in batches)
-      for (const account of accountsToImport) {
-        if (!account.account_name) {
+      console.log("Processed accounts for import:", accountsToImport.length)
+      
+      // Import accounts one by one with progress updates
+      for (let i = 0; i < accountsToImport.length; i++) {
+        const account = accountsToImport[i]
+        
+        // Update progress
+        setImportProgress({ current: i + 1, total: accountsToImport.length })
+        
+        if (!account.account_name || account.account_name.trim() === '') {
+          console.log(`Skipping row ${i + 2} with no account name:`, account)
           failCount++
           continue
         }
         
         try {
+          console.log("Importing account:", account.account_name)
+          
           const response = await fetch('/api/accounts', {
             method: 'POST',
             headers: {
@@ -369,26 +546,61 @@ export function AccountsContent() {
           })
           
           if (response.ok) {
+            console.log("Successfully imported:", account.account_name)
             successCount++
           } else {
-            failCount++
+            const errorText = await response.text()
+            console.log("Failed to import:", account.account_name, response.status, errorText)
+            
+            // Check if it's a duplicate error
+            if (response.status === 400 && errorText.includes('already exists')) {
+              console.log("Skipping duplicate:", account.account_name)
+              // Consider this a "success" since the record exists
+              successCount++
+            } else {
+              failCount++
+            }
           }
         } catch (error) {
-          console.error('Error importing account:', error)
+          console.error('Error importing account:', account.account_name, error)
           failCount++
         }
+        
+        // Small delay to show progress
+        await new Promise(resolve => setTimeout(resolve, 50))
       }
       
-      // Reload accounts from API
-      await loadAccountsFromAPI()
+      // Wait a moment for database to sync, then reload accounts from API
+      setTimeout(async () => {
+        await loadAccountsFromAPI()
+        console.log("Accounts reloaded after import")
+      }, 1000)
+      
+      const totalRecords = data.length
+      const duplicateCount = successCount - (totalRecords - failCount - (successCount + failCount))
+      
+      console.log(`Import Summary:`)
+      console.log(`- Total records in file: ${totalRecords}`)
+      console.log(`- Successfully imported: ${successCount}`)
+      console.log(`- Failed/Skipped: ${failCount}`)
+      console.log(`- Processing rate: ${Math.round((successCount / totalRecords) * 100)}%`)
+      
+      // Clear loading state and close modal
+      setIsImporting(false)
+      setImportProgress({ current: 0, total: 0 })
+      setIsImportModalOpen(false)
       
       toast({
         title: "Import completed",
-        description: `Successfully imported ${successCount} accounts. ${failCount > 0 ? `Failed: ${failCount}` : ''}`
+        description: `Processed ${successCount}/${totalRecords} accounts successfully. ${failCount > 0 ? `Skipped: ${failCount} (likely duplicates or empty names)` : ''}`
       })
       
     } catch (error) {
       console.error('Import error:', error)
+      // Clear loading state on error
+      setIsImporting(false)
+      setImportProgress({ current: 0, total: 0 })
+      
       toast({
         title: "Import failed",
         description: "An error occurred while importing accounts.",
@@ -397,21 +609,49 @@ export function AccountsContent() {
     }
   }
 
-  const handleExport = () => {
-    const dataStr = JSON.stringify(accounts, null, 2)
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr)
-    
-    const exportFileDefaultName = `accounts_${new Date().toISOString().split('T')[0]}.json`
-    
-    const linkElement = document.createElement('a')
-    linkElement.setAttribute('href', dataUri)
-    linkElement.setAttribute('download', exportFileDefaultName)
-    linkElement.click()
-    
-    toast({
-      title: "Data exported",
-      description: "Accounts data has been exported to JSON file."
-    })
+  const handleExport = async () => {
+    try {
+      console.log('Export button clicked, accounts data:', accounts)
+      
+      const success = await exportToExcel(accounts, {
+        filename: `accounts_${new Date().toISOString().split('T')[0]}`,
+        sheetName: 'Accounts',
+        columns: [
+          { key: 'accountName', label: 'Company Name', width: 20 },
+          { key: 'industry', label: 'Industry', width: 15 },
+          { key: 'city', label: 'City', width: 15 },
+          { key: 'state', label: 'State', width: 15 },
+          { key: 'country', label: 'Country', width: 15 },
+          { key: 'contactNo', label: 'Contact Phone', width: 15 },
+          { key: 'email', label: 'Email', width: 25 },
+          { key: 'website', label: 'Website', width: 25 },
+          { key: 'address', label: 'Address', width: 30 },
+          { key: 'assignedTo', label: 'Assigned To', width: 15 },
+          { key: 'status', label: 'Status', width: 12 },
+          { key: 'createdAt', label: 'Created Date', width: 15 }
+        ]
+      })
+      
+      if (success) {
+        toast({
+          title: "Data exported",
+          description: "Accounts data has been exported to Excel file."
+        })
+      } else {
+        toast({
+          title: "Export failed",
+          description: "Failed to export accounts data. Please try again.",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Export error:', error)
+      toast({
+        title: "Export failed",
+        description: "Failed to export accounts data. Please try again.",
+        variant: "destructive"
+      })
+    }
   }
 
   const getStatusColor = (status: string) => {
@@ -455,43 +695,83 @@ export function AccountsContent() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Accounts</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{accountStats.total}</div>
-            <p className="text-xs text-muted-foreground">+{accountStats.newThisMonth} this month</p>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="p-2 rounded-lg bg-blue-100">
+                <Building2 className="w-6 h-6 text-blue-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold">
+                  {isLoadingStats ? (
+                    <div className="w-12 h-8 bg-gray-200 animate-pulse rounded"></div>
+                  ) : (
+                    accountStats.total
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">Total Accounts</p>
+                <p className="text-xs text-green-600">+{accountStats.newThisMonth} this month</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Accounts</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{accountStats.active}</div>
-            <p className="text-xs text-muted-foreground">{Math.round((accountStats.active / accountStats.total) * 100) || 0}% of total</p>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="p-2 rounded-lg bg-green-100">
+                <CheckCircle className="w-6 h-6 text-green-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold">
+                  {isLoadingStats ? (
+                    <div className="w-12 h-8 bg-gray-200 animate-pulse rounded"></div>
+                  ) : (
+                    accountStats.active
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">Active Accounts</p>
+                <p className="text-xs text-gray-600">{Math.round((accountStats.active / accountStats.total) * 100) || 0}% of total</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">New This Month</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{accountStats.newThisMonth}</div>
-            <p className="text-xs text-muted-foreground">Recent additions</p>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="p-2 rounded-lg bg-purple-100">
+                <Factory className="w-6 h-6 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold">
+                  {isLoadingStats ? (
+                    <div className="w-12 h-8 bg-gray-200 animate-pulse rounded"></div>
+                  ) : (
+                    accountStats.mostActiveIndustryCount
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">Active Industry</p>
+                <p className="text-xs font-medium text-gray-700">{accountStats.mostActiveIndustry}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Regions</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{accountStats.activeRegions}</div>
-            <p className="text-xs text-muted-foreground">Geographic coverage</p>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="p-2 rounded-lg bg-orange-100">
+                <Globe className="w-6 h-6 text-orange-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold">
+                  {isLoadingStats ? (
+                    <div className="w-12 h-8 bg-gray-200 animate-pulse rounded"></div>
+                  ) : (
+                    accountStats.mostActiveCountryCount
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">Active Countries</p>
+                <p className="text-xs font-medium text-gray-700">{accountStats.mostActiveCountry}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -514,14 +794,14 @@ export function AccountsContent() {
                 />
               </div>
             </div>
-            <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+            <Select value={selectedCountry} onValueChange={setSelectedCountry}>
               <SelectTrigger className="w-48">
-                <SelectValue placeholder="Region" />
+                <SelectValue placeholder="Country" />
               </SelectTrigger>
               <SelectContent>
-                {regions.map((region) => (
-                  <SelectItem key={region} value={region}>
-                    {region}
+                {countries.map((country) => (
+                  <SelectItem key={country} value={country}>
+                    {country}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -556,62 +836,131 @@ export function AccountsContent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Accounts List</CardTitle>
-          <CardDescription>Showing {filteredAccounts.length} of {accounts.length} accounts</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Accounts List</CardTitle>
+              <CardDescription>Latest accounts and their current status</CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table key={accounts.length}>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Account Name</TableHead>
-                  <TableHead>Industry</TableHead>
-                  <TableHead>Contact Name</TableHead>
-                  <TableHead>Contact Number</TableHead>
-                  <TableHead>City/State</TableHead>
-                  <TableHead>Region</TableHead>
-                  <TableHead>Assigned To</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredAccounts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
-                      No accounts found. Click "Add Account" to create your first account.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredAccounts.map((account) => (
-                    <TableRow key={account.id}>
-                      <TableCell className="font-medium">{account.accountName}</TableCell>
-                      <TableCell>{account.industry || "—"}</TableCell>
-                      <TableCell>{account.contactName || "—"}</TableCell>
-                      <TableCell>{account.contactNo || "—"}</TableCell>
-                      <TableCell>{account.city ? `${account.city}${account.state ? `/${account.state}` : ''}` : "—"}</TableCell>
-                      <TableCell>{account.region || "—"}</TableCell>
-                      <TableCell>{account.assignedTo || "—"}</TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(account.status || '')}>
-                          {account.status || "Active"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-1">
-                          <Button variant="ghost" size="sm" onClick={() => handleEditAccount(account)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteAccount(account.id)}>
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </Button>
+          <div className="space-y-4">
+            {filteredAccounts.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No accounts found. Click "Add Account" to create your first account.
+              </div>
+            ) : (
+              filteredAccounts.map((account) => {
+                // Build location string combining city, state, and country
+                const locationParts = []
+                if (account.city) locationParts.push(account.city)
+                if (account.state) locationParts.push(account.state)
+                if (account.country) locationParts.push(account.country)
+                const location = locationParts.join(', ') || "—"
+                
+                return (
+                  <div
+                    key={account.id}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <Building2 className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <h3 className="font-semibold">{account.accountName}</h3>
+                          <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+                            {account.status || 'Active'}
+                          </span>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                        <p className="text-sm text-gray-600">{location}</p>
+                        <div className="text-xs text-gray-500 space-y-1">
+                          {account.contactName && <p>Contact: {account.contactName}</p>}
+                          {account.industry && <p>Industry: {account.industry}</p>}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Center section - Contact details */}
+                    <div className="flex-1 flex flex-col items-center justify-center space-y-1">
+                      {account.contactNo && (
+                        <div className="flex items-center text-xs text-gray-500">
+                          <Phone className="w-3 h-3 mr-1" />
+                          <span>{account.contactNo}</span>
+                        </div>
+                      )}
+                      {account.email && (
+                        <div className="flex items-center text-xs text-gray-500">
+                          <Mail className="w-3 h-3 mr-1" />
+                          <span>{account.email}</span>
+                        </div>
+                      )}
+                      {account.website && (
+                        <div className="flex items-center text-xs">
+                          <span className="text-blue-600">{account.website}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right section - Assigned to and actions */}
+                    <div className="flex items-center space-x-4">
+                      <div className="text-right">
+                        <p className="text-sm text-gray-500">
+                          Assigned to: <span className="font-medium text-gray-900">{account.assignedTo || "Unassigned"}</span>
+                        </p>
+                      </div>
+                      <div className="flex space-x-1">
+                        {/* Communication Buttons */}
+                        {account.contactNo && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => window.open(`tel:${account.contactNo}`, '_self')}
+                            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                            title="Call Contact"
+                          >
+                            <Phone className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {account.contactNo && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => window.open(`https://wa.me/${account.contactNo.replace(/[^\d]/g, '')}`, '_blank')}
+                            className="text-green-600 hover:text-green-800 hover:bg-green-50"
+                            title="WhatsApp Contact"
+                          >
+                            <WhatsAppIcon className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {account.email && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => window.open(`mailto:${account.email}`, '_self')}
+                            className="text-orange-600 hover:text-orange-800 hover:bg-orange-50"
+                            title="Send Email"
+                          >
+                            <Mail className="w-4 h-4" />
+                          </Button>
+                        )}
+                        
+                        {/* Action Buttons */}
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          title="Edit Account"
+                          onClick={() => handleEditAccount(account)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })
+            )}
           </div>
         </CardContent>
       </Card>
@@ -655,7 +1004,7 @@ export function AccountsContent() {
               />
             </div>
             <div>
-              <Label htmlFor="contactNo">Contact Number</Label>
+              <Label htmlFor="contactNo">Contact Phone</Label>
               <Input
                 id="contactNo"
                 value={formData.contactNo}
@@ -682,6 +1031,20 @@ export function AccountsContent() {
                 placeholder="www.company.com"
               />
             </div>
+          </div>
+          
+          <div>
+            <Label htmlFor="address">Address</Label>
+            <Textarea
+              id="address"
+              value={formData.address}
+              onChange={(e) => setFormData({...formData, address: e.target.value})}
+              placeholder="Enter complete address"
+              rows={3}
+            />
+          </div>
+          
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <Label htmlFor="city">City</Label>
               <Input
@@ -701,14 +1064,14 @@ export function AccountsContent() {
               />
             </div>
             <div>
-              <Label htmlFor="region">Region</Label>
-              <Select value={formData.region} onValueChange={(value) => setFormData({...formData, region: value})}>
+              <Label htmlFor="country">Country</Label>
+              <Select value={formData.country} onValueChange={(value) => setFormData({...formData, country: value})}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select region" />
+                  <SelectValue placeholder="Select country" />
                 </SelectTrigger>
                 <SelectContent>
-                  {regions.filter(r => r !== "All").map((region) => (
-                    <SelectItem key={region} value={region}>{region}</SelectItem>
+                  {countries.filter(c => c !== "All").map((country) => (
+                    <SelectItem key={country} value={country}>{country}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -722,33 +1085,24 @@ export function AccountsContent() {
                 placeholder="Sales representative"
               />
             </div>
-            <div>
-              <Label htmlFor="turnover">Annual Turnover</Label>
-              <Input
-                id="turnover"
-                value={formData.turnover}
-                onChange={(e) => setFormData({...formData, turnover: e.target.value})}
-                placeholder="₹50L"
-              />
-            </div>
-            <div>
-              <Label htmlFor="employees">Employees</Label>
-              <Input
-                id="employees"
-                value={formData.employees}
-                onChange={(e) => setFormData({...formData, employees: e.target.value})}
-                placeholder="50-100"
-              />
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddAccountOpen(false)}>
               <X className="w-4 h-4 mr-2" />
               Cancel
             </Button>
-            <Button onClick={handleSaveAccount} className="bg-blue-600 hover:bg-blue-700">
-              <Save className="w-4 h-4 mr-2" />
-              Save Account
+            <Button onClick={handleSaveAccount} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
+              {isSaving ? (
+                <>
+                  <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Account
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -793,7 +1147,7 @@ export function AccountsContent() {
               />
             </div>
             <div>
-              <Label htmlFor="edit-contactNo">Contact Number</Label>
+              <Label htmlFor="edit-contactNo">Contact Phone</Label>
               <Input
                 id="edit-contactNo"
                 value={formData.contactNo}
@@ -820,6 +1174,20 @@ export function AccountsContent() {
                 placeholder="www.company.com"
               />
             </div>
+          </div>
+          
+          <div>
+            <Label htmlFor="edit-address">Address</Label>
+            <Textarea
+              id="edit-address"
+              value={formData.address}
+              onChange={(e) => setFormData({...formData, address: e.target.value})}
+              placeholder="Enter complete address"
+              rows={3}
+            />
+          </div>
+          
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <Label htmlFor="edit-city">City</Label>
               <Input
@@ -839,14 +1207,14 @@ export function AccountsContent() {
               />
             </div>
             <div>
-              <Label htmlFor="edit-region">Region</Label>
-              <Select value={formData.region} onValueChange={(value) => setFormData({...formData, region: value})}>
+              <Label htmlFor="edit-country">Country</Label>
+              <Select value={formData.country} onValueChange={(value) => setFormData({...formData, country: value})}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select region" />
+                  <SelectValue placeholder="Select country" />
                 </SelectTrigger>
                 <SelectContent>
-                  {regions.filter(r => r !== "All").map((region) => (
-                    <SelectItem key={region} value={region}>{region}</SelectItem>
+                  {countries.filter(c => c !== "All").map((country) => (
+                    <SelectItem key={country} value={country}>{country}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -873,35 +1241,36 @@ export function AccountsContent() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="edit-turnover">Annual Turnover</Label>
-              <Input
-                id="edit-turnover"
-                value={formData.turnover}
-                onChange={(e) => setFormData({...formData, turnover: e.target.value})}
-                placeholder="₹50L"
-              />
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditAccountOpen(false)}>
               <X className="w-4 h-4 mr-2" />
               Cancel
             </Button>
-            <Button onClick={handleSaveAccount} className="bg-blue-600 hover:bg-blue-700">
-              <Save className="w-4 h-4 mr-2" />
-              Update Account
+            <Button onClick={handleSaveAccount} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
+              {isSaving ? (
+                <>
+                  <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  {editingAccount ? 'Updating...' : 'Saving...'}
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  {editingAccount ? 'Update Account' : 'Save Account'}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Data Import Modal */}
-      <DataImportModal
+      {/* Simple File Import */}
+      <SimpleFileImport
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
-        moduleType="accounts"
         onImport={handleImportData}
+        isImporting={isImporting}
+        importProgress={importProgress}
       />
     </div>
   )

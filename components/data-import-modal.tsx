@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
-import * as XLSX from 'xlsx'
+import dynamic from 'next/dynamic'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -111,13 +111,12 @@ export function DataImportModal({ isOpen, onClose, moduleType, onImport }: DataI
         { key: "contactNo", label: "Contact Number", required: false },
         { key: "email", label: "Email Address", required: false },
         { key: "website", label: "Website", required: false },
+        { key: "address", label: "Address", required: false },
         { key: "city", label: "City", required: false },
         { key: "state", label: "State", required: false },
-        { key: "region", label: "Region", required: false },
+        { key: "country", label: "Country", required: false },
         { key: "assignedTo", label: "Assigned To", required: false },
-        { key: "status", label: "Account Status", required: false },
-        { key: "turnover", label: "Annual Turnover", required: false },
-        { key: "employees", label: "Employee Count", required: false }
+        { key: "status", label: "Account Status", required: false }
       ]
     },
     contacts: {
@@ -164,18 +163,16 @@ export function DataImportModal({ isOpen, onClose, moduleType, onImport }: DataI
       title: "Import Products",
       icon: <Package className="w-5 h-5" />,
       fields: [
-        { key: "productName", label: "Product Name", required: true },
-        { key: "branch", label: "Branch/Division", required: false },
-        { key: "category", label: "Category", required: true },
-        { key: "principal", label: "Principal", required: false },
-        { key: "refNo", label: "Reference Number", required: false },
-        { key: "price", label: "Price", required: true },
-        { key: "status", label: "Status", required: false },
-        { key: "assignedTo", label: "Assigned To", required: false },
+        { key: "product_name", label: "Product Name", required: true },
+        { key: "product_reference_no", label: "Product Reference No/ID", required: false },
         { key: "description", label: "Description", required: false },
-        { key: "specifications", label: "Specifications", required: false },
-        { key: "warranty", label: "Warranty", required: false },
-        { key: "supplier", label: "Supplier", required: false },
+        { key: "principal", label: "Principal", required: false },
+        { key: "category", label: "Category", required: false },
+        { key: "sub_category", label: "Sub Category", required: false },
+        { key: "price", label: "Price", required: true },
+        { key: "branch", label: "Branch/Division", required: false },
+        { key: "status", label: "Status", required: false },
+        { key: "assigned_to", label: "Assigned To", required: false },
         { key: "model", label: "Model", required: false }
       ]
     },
@@ -264,96 +261,148 @@ export function DataImportModal({ isOpen, onClose, moduleType, onImport }: DataI
     }
   ]
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    setUploadedFile(file)
-    
-    const fileExtension = file.name.split('.').pop()?.toLowerCase()
-    
-    if (fileExtension === 'csv') {
-      // Handle CSV files
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const content = e.target?.result as string
-        const lines = content.split('\n')
-        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
-        const data = lines.slice(1).filter(line => line.trim()).map(line => {
-          const values = line.split(',').map(v => v.trim().replace(/"/g, ''))
-          const row: any = {}
-          headers.forEach((header, index) => {
-            row[header] = values[index] || ''
-          })
-          return row
-        })
-
-        setCsvHeaders(headers)
-        setCsvData(data)
-        
-        // Initialize field mappings
-        const mappings: FieldMapping[] = currentConfig.fields.map(field => ({
-          csvField: '',
-          crmField: field.key,
-          required: field.required
-        }))
-        setFieldMappings(mappings)
-        
-        setCurrentStep(2)
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('File upload handler called')
+    try {
+      const file = event.target.files?.[0]
+      if (!file) {
+        console.log('No file selected')
+        return
       }
-      reader.readAsText(file)
-    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-      // Handle Excel files
-      const reader = new FileReader()
-      reader.onload = (e) => {
+
+      console.log('File selected:', file.name, file.type, file.size)
+      setUploadedFile(file)
+      
+      const fileExtension = file.name.split('.').pop()?.toLowerCase()
+      console.log('File extension:', fileExtension)
+      
+      if (fileExtension === 'csv') {
+        // Handle CSV files
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          try {
+            const content = e.target?.result as string
+            const lines = content.split('\n')
+            const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
+            const data = lines.slice(1).filter(line => line.trim()).map(line => {
+              const values = line.split(',').map(v => v.trim().replace(/"/g, ''))
+              const row: any = {}
+              headers.forEach((header, index) => {
+                row[header] = values[index] || ''
+              })
+              return row
+            })
+
+            setCsvHeaders(headers)
+            setCsvData(data)
+            
+            // Initialize field mappings
+            const mappings: FieldMapping[] = currentConfig.fields.map(field => ({
+              csvField: '',
+              crmField: field.key,
+              required: field.required
+            }))
+            setFieldMappings(mappings)
+            
+            setCurrentStep(2)
+          } catch (error) {
+            console.error('Error parsing CSV:', error)
+            alert('Error reading CSV file. Please check the file format.')
+          }
+        }
+        reader.readAsText(file)
+      } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+        // Handle Excel files with dynamic import to avoid SSR issues
+        console.log('Processing Excel file...')
+        
         try {
-          const data = e.target?.result
-          const workbook = XLSX.read(data, { type: 'binary' })
+          // Dynamic import of XLSX to avoid build/SSR issues
+          const XLSX = await import('xlsx')
+          console.log('XLSX library loaded dynamically')
           
-          // Get the first worksheet
-          const firstSheetName = workbook.SheetNames[0]
-          const worksheet = workbook.Sheets[firstSheetName]
-          
-          // Convert to JSON
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][]
-          
-          if (jsonData.length === 0) {
-            alert('The Excel file appears to be empty')
-            return
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            try {
+              console.log('FileReader loaded successfully')
+              const data = e.target?.result
+              if (!data) {
+                throw new Error('Failed to read file data')
+              }
+              
+              console.log('Reading workbook with XLSX...')
+              const workbook = XLSX.read(data, { type: 'array' })
+              console.log('Workbook loaded, sheet names:', workbook.SheetNames)
+              
+              if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+                throw new Error('No worksheets found in Excel file')
+              }
+              
+              // Get the first worksheet
+              const firstSheetName = workbook.SheetNames[0]
+              const worksheet = workbook.Sheets[firstSheetName]
+              console.log('Processing worksheet:', firstSheetName)
+              
+              // Convert to JSON
+              const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][]
+              console.log('JSON data extracted, rows:', jsonData.length)
+              
+              if (jsonData.length === 0) {
+                alert('The Excel file appears to be empty')
+                return
+              }
+              
+              // Extract headers from first row
+              const headers = jsonData[0].map(h => String(h || '').trim())
+              console.log('Headers extracted:', headers)
+              
+              // Extract data from remaining rows
+              const dataRows = jsonData.slice(1).filter(row => row && row.some(cell => cell)).map(row => {
+                const rowData: any = {}
+                headers.forEach((header, index) => {
+                  rowData[header] = String(row[index] || '').trim()
+                })
+                return rowData
+              })
+              
+              console.log('Data rows processed:', dataRows.length)
+              
+              setCsvHeaders(headers)
+              setCsvData(dataRows)
+              
+              // Initialize field mappings
+              const mappings: FieldMapping[] = currentConfig.fields.map(field => ({
+                csvField: '',
+                crmField: field.key,
+                required: field.required
+              }))
+              setFieldMappings(mappings)
+              
+              console.log('Moving to step 2')
+              setCurrentStep(2)
+            } catch (error) {
+              console.error('Error parsing Excel file:', error)
+              alert(`Error reading Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`)
+            }
           }
           
-          // Extract headers from first row
-          const headers = jsonData[0].map(h => String(h || '').trim())
+          reader.onerror = (error) => {
+            console.error('FileReader error:', error)
+            alert('Error reading file. Please try again.')
+          }
           
-          // Extract data from remaining rows
-          const dataRows = jsonData.slice(1).filter(row => row.some(cell => cell)).map(row => {
-            const rowData: any = {}
-            headers.forEach((header, index) => {
-              rowData[header] = row[index] || ''
-            })
-            return rowData
-          })
-          
-          setCsvHeaders(headers)
-          setCsvData(dataRows)
-          
-          // Initialize field mappings
-          const mappings: FieldMapping[] = currentConfig.fields.map(field => ({
-            csvField: '',
-            crmField: field.key,
-            required: field.required
-          }))
-          setFieldMappings(mappings)
-          
-          setCurrentStep(2)
-        } catch (error) {
-          console.error('Error parsing Excel file:', error)
-          alert('Error reading Excel file. Please check the file format.')
+          console.log('Starting to read file as ArrayBuffer...')
+          reader.readAsArrayBuffer(file)
+        } catch (importError) {
+          console.error('Error loading XLSX library:', importError)
+          alert('Failed to load Excel processing library. Please refresh the page and try again.')
         }
+      } else {
+        console.log('Unsupported file type:', fileExtension)
+        alert('Please upload a CSV or Excel file')
       }
-      reader.readAsBinaryString(file)
-    } else {
-      alert('Please upload a CSV or Excel file')
+    } catch (error) {
+      console.error('Error in file upload handler:', error)
+      alert('An error occurred while processing the file. Please try again.')
     }
   }
 
@@ -454,6 +503,8 @@ export function DataImportModal({ isOpen, onClose, moduleType, onImport }: DataI
           return '+91 98765 43210'
         case 'industry':
           return 'Biotechnology'
+        case 'address':
+          return '123 MG Road, Koramangala, Bangalore'
         case 'city':
           return 'Bangalore'
         case 'state':

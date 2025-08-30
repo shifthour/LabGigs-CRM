@@ -6,6 +6,29 @@
   .text-balance {
     text-wrap: balance;
   }
+  
+  .custom-scrollbar {
+    overflow-y: scroll !important;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    display: block !important;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: 4px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #9ca3af;
+    border-radius: 4px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+  }
 }
 
 @layer base {

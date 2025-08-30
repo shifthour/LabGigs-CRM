@@ -2,6 +2,10 @@ import { RoleBasedSidebar } from "@/components/role-based-sidebar"
 import { Header } from "@/components/header"
 import { OpportunitiesContent } from "@/components/opportunities-content"
 
+export const metadata = {
+  title: "Deals",
+}
+
 export default function OpportunitiesPage() {
   return (
     <div className="flex h-screen bg-gray-50">

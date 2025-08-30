@@ -5,181 +5,437 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Download, Eye, Edit, Package, Upload } from "lucide-react"
-import { AIProductRecommendations } from "@/components/ai-product-recommendations"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Plus, Search, Download, Edit, Package, Upload, ChevronDown, ChevronUp, X, ShoppingCart, CheckCircle, Grid3X3, IndianRupee } from "lucide-react"
+// import { AIProductRecommendations } from "@/components/ai-product-recommendations"
 import { AddProductModal } from "@/components/add-product-modal"
-import { DataImportModal } from "@/components/data-import-modal"
+import { ProductsFileImport } from "@/components/products-file-import"
 import { useToast } from "@/hooks/use-toast"
-import storageService from "@/lib/localStorage-service"
 
-const products = [
-  {
-    id: 1,
-    branch: "SPR System-",
-    category: "Affinite Instrument",
-    principal: "Affinite Instrument",
-    productName: "ENABLING STATIC AND FLOW-BASED SPR ANALYSIS WITH P4PRO & AFF",
-    refNo: "P4PRO & AFFIUMP",
-    assignedTo: "Hari Kumar K, Prashanth Sandily",
-    status: "Active",
-    price: "₹12,50,000",
-  },
-  {
-    id: 2,
-    branch: "Lab Setup-",
-    category: "Airone Source Pvt Ltd",
-    principal: "Airone Source Pvt Ltd",
-    productName: "ANNEXURE I (Production Area) Raw Material",
-    refNo: "",
-    assignedTo: "Hari Kumar K, Prashanth Sandily",
-    status: "Active",
-    price: "₹8,75,000",
-  },
-  {
-    id: 3,
-    branch: "Media Preparators-",
-    category: "Alliance Bio Expertise",
-    principal: "Alliance Bio Expertise",
-    productName: "Automated Media Preparator - 1 To 10 Liters",
-    refNo: "MEDIA WEL 10",
-    assignedTo: "Hari Kumar K, Prashanth Sandily",
-    status: "Active",
-    price: "₹15,25,000",
-  },
-  {
-    id: 4,
-    branch: "Freezer-Laboratory Freezer",
-    category: "ALPHAVITA Bio Scientific",
-    principal: "ALPHAVITA Bio Scientific",
-    productName: "Laboratory Freezer",
-    refNo: "MDF- U549HI",
-    assignedTo: "Hari Kumar K, Prashanth Sandily",
-    status: "Active",
-    price: "₹3,45,000",
-  },
-  {
-    id: 5,
-    branch: "Bio Safety Cabinet-",
-    category: "ALSIN Technology Services",
-    principal: "ALSIN Technology Services",
-    productName: "ABSC4-B2-SS304 -Bio-Safety cabinet B2-SS 304- ALSIN",
-    refNo: "ABSC4-B2-SS304",
-    assignedTo: "Hari Kumar K, Prashanth Sandily",
-    status: "Active",
-    price: "₹4,85,000",
-  },
-]
+// All product data now comes from Supabase backend - no mock data
 
-const branches = [
-  "All",
-  "SPR System",
-  "Lab Setup",
-  "Media Preparators",
-  "Freezer-Laboratory Freezer",
-  "Bio Safety Cabinet",
-  "Water Purification System",
-]
-const principals = [
-  "All",
-  "Affinite Instrument",
-  "Airone Source Pvt Ltd",
-  "Alliance Bio Expertise",
-  "ALPHAVITA Bio Scientific",
-  "ALSIN Technology Services",
-]
-const statuses = ["All", "Active", "Inactive", "Discontinued"]
+// Dynamic categories will be populated from actual product data
+const statuses = ["All", "Active", "Inactive"]
 
 export function ProductsContent() {
   const { toast } = useToast()
   const [productsList, setProductsList] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
+  const [isLoadingStats, setIsLoadingStats] = useState(true)
   const [productsStats, setProductsStats] = useState({
     total: 0,
     active: 0,
     categories: 0,
     avgValue: 0
   })
-  const [selectedBranch, setSelectedBranch] = useState("All")
   const [selectedPrincipal, setSelectedPrincipal] = useState("All")
+  const [selectedCategory, setSelectedCategory] = useState("All")
   const [selectedStatus, setSelectedStatus] = useState("All")
+  const [availablePrincipals, setAvailablePrincipals] = useState<string[]>(["All"])
+  const [availableCategories, setAvailableCategories] = useState<string[]>(["All"])
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false)
   const [isDataImportModalOpen, setIsDataImportModalOpen] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<any>(null)
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<number>>(new Set())
+  const [isImporting, setIsImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 })
+  const [zoomedImage, setZoomedImage] = useState<{ url: string; name: string } | null>(null)
 
-  // Load products from localStorage on component mount
+  // Load products from database on component mount
   useEffect(() => {
     loadProducts()
   }, [])
 
-  const loadProducts = () => {
-    const storedProducts = storageService.getAll<any>('products')
-    console.log("loadProducts - storedProducts:", storedProducts)
-    setProductsList(storedProducts)
-    
-    // Calculate stats
-    const stats = storageService.getStats('products')
-    const activeProducts = storedProducts.filter(product => product.status === 'Active').length
-    const categories = [...new Set(storedProducts.map(product => product.category))].length
-    const avgValue = storedProducts.length > 0 
-      ? storedProducts.reduce((sum, product) => {
-          const value = parseFloat(product.price?.replace(/[₹,]/g, '') || '0')
-          return sum + value
-        }, 0) / storedProducts.length 
-      : 0
-    
-    setProductsStats({
-      total: stats.total,
-      active: activeProducts,
-      categories: categories,
-      avgValue: avgValue
-    })
-  }
-  
-  const handleSaveProduct = (productData: any) => {
-    console.log("handleSaveProduct called with:", productData)
-    
-    const newProduct = storageService.create('products', productData)
-    console.log("New product created:", newProduct)
-    
-    if (newProduct) {
-      // Force immediate refresh from localStorage
-      const refreshedProducts = storageService.getAll<any>('products')
-      console.log("Force refresh - all products:", refreshedProducts)
-      setProductsList(refreshedProducts)
+  const loadProducts = async () => {
+    try {
+      const companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
+      const response = await fetch(`/api/products?companyId=${companyId}`)
       
-      // Update stats
-      loadProducts()
+      if (!response.ok) {
+        console.error('Failed to load products')
+        // No fallback data - show empty state
+        setProductsList([])
+        calculateStats([])
+        extractFilterOptions([])
+        
+        toast({
+          title: "Error loading products",
+          description: "Failed to load products from database. Please try refreshing the page.",
+          variant: "destructive"
+        })
+        return
+      }
       
-      toast({
-        title: "Product created",
-        description: `Product ${newProduct.productName || newProduct.id} has been successfully created.`
+      const data = await response.json()
+      console.log('Raw API data:', data)
+      
+      const formattedProducts = data.map((product: any) => {
+        console.log('Processing product:', product)
+        return {
+          id: product.id,
+          branch: product.branch || '',
+          category: product.category || '',
+          principal: product.principal || '',
+          productName: product.product_name,
+          refNo: product.product_reference_no || '',
+          assignedTo: product.assigned_to || 'Hari Kumar K, Prashanth Sandily',
+          status: product.status || 'Active',
+          price: `₹${product.price?.toLocaleString() || '0'}`,
+          description: product.description || '',
+          product_picture: product.product_picture || null,
+        }
       })
-      setIsAddProductModalOpen(false)
-    } else {
-      console.error("Failed to create product")
+      
+      console.log('Formatted products:', formattedProducts)
+      setProductsList(formattedProducts)
+      calculateStats(formattedProducts)
+      extractFilterOptions(formattedProducts)
+    } catch (error) {
+      console.error('Error loading products:', error)
+      // No fallback data - show empty state
+      setProductsList([])
+      calculateStats([])
+      extractFilterOptions([])
+      
       toast({
-        title: "Error",
-        description: "Failed to create product",
+        title: "Error loading products",
+        description: "Failed to load products from database. Please try refreshing the page.",
         variant: "destructive"
       })
     }
   }
   
-  const handleImportData = (importedProducts: any[]) => {
-    console.log('Imported products:', importedProducts)
-    const createdProducts = storageService.createMany('products', importedProducts)
+  const calculateStats = (productsList: any[]) => {
+    const activeProducts = productsList.filter(product => product.status === 'Active').length
+    const categories = [...new Set(productsList.map(product => product.category))].length
+    const avgValue = productsList.length > 0 
+      ? productsList.reduce((sum, product) => {
+          const value = parseFloat(product.price?.replace(/[₹,]/g, '') || '0')
+          return sum + value
+        }, 0) / productsList.length 
+      : 0
     
-    // Immediately add imported products to state
-    setProductsList(prevProducts => [...prevProducts, ...createdProducts])
-    
-    // Update stats
-    loadProducts()
-    
-    toast({
-      title: "Data imported",
-      description: `Successfully imported ${createdProducts.length} products.`
+    setProductsStats({
+      total: productsList.length,
+      active: activeProducts,
+      categories: categories,
+      avgValue: avgValue
     })
+    
+    setIsLoadingStats(false)
+  }
+
+  const extractFilterOptions = (productsList: any[]) => {
+    // Extract unique principals
+    const principals = [...new Set(productsList
+      .map(product => product.principal)
+      .filter(principal => principal && principal.trim() !== ''))]
+      .sort()
+    setAvailablePrincipals(["All", ...principals])
+
+    // Extract unique categories  
+    const categories = [...new Set(productsList
+      .map(product => product.category)
+      .filter(category => category && category.trim() !== ''))]
+      .sort()
+    setAvailableCategories(["All", ...categories])
+  }
+  
+  const handleSaveProduct = async (productData: any) => {
+    try {
+      const companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
+      
+      // Check if we're editing an existing product
+      const isEditing = editingProduct && editingProduct.id
+      const method = isEditing ? 'PUT' : 'POST'
+      const url = '/api/products'
+      
+      const requestBody = isEditing 
+        ? {
+            id: editingProduct.id,
+            ...productData,
+            companyId
+          }
+        : {
+            ...productData,
+            companyId
+          }
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Failed to ${isEditing ? 'update' : 'create'} product`)
+      }
+      
+      const savedProduct = await response.json()
+      
+      toast({
+        title: isEditing ? "Product updated" : "Product created",
+        description: `Product ${productData.product_name} has been successfully ${isEditing ? 'updated' : 'created'}.`
+      })
+      
+      setIsAddProductModalOpen(false)
+      setEditingProduct(null)
+      
+      // Reload products to show the changes
+      await loadProducts()
+    } catch (error) {
+      console.error(`Error ${editingProduct ? 'updating' : 'creating'} product:`, error)
+      toast({
+        title: "Error",
+        description: `Failed to ${editingProduct ? 'update' : 'create'} product. Please try again.`,
+        variant: "destructive"
+      })
+    }
+  }
+  
+  const handleImportData = async (data: any[]) => {
+    try {
+      // Set loading state
+      setIsImporting(true)
+      setImportProgress({ current: 0, total: data.length })
+      
+      // Get current user's company ID
+      const storedUser = localStorage.getItem('user')
+      if (!storedUser) {
+        toast({
+          title: "Error",
+          description: "User not found. Please login again.",
+          variant: "destructive"
+        })
+        setIsImporting(false)
+        return
+      }
+      
+      const user = JSON.parse(storedUser)
+      if (!user.company_id) {
+        toast({
+          title: "Error",
+          description: "Company not found. Please login again.",
+          variant: "destructive"
+        })
+        setIsImporting(false)
+        return
+      }
+      
+      console.log("Starting import of", data.length, "records")
+      console.log("Sample data item:", data[0])
+      
+      // Show initial toast
+      toast({
+        title: "Import started",
+        description: `Processing ${data.length} products...`
+      })
+      
+      // Function to download and convert image to base64
+      const downloadImageAsBase64 = async (imageUrl: string): Promise<string | null> => {
+        try {
+          if (!imageUrl || imageUrl.trim() === '') return null
+          
+          const response = await fetch(imageUrl)
+          if (!response.ok) return null
+          
+          const blob = await response.blob()
+          return new Promise((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.onerror = () => resolve(null)
+            reader.readAsDataURL(blob)
+          })
+        } catch (error) {
+          console.error('Error downloading image:', error)
+          return null
+        }
+      }
+
+      // Prepare products for import - flexible field mapping
+      const productsToImport = data.map(item => {
+        // Try multiple possible field names for product name
+        const productName = item.product_name || item['Product Name'] || item.productName || 
+                           item['Product name'] || item.name || item.Name || ''
+        
+        return {
+          product_name: productName,
+          product_reference_no: item.product_reference_no || item['Product Reference No/ID'] || item.productReferenceNo || 
+                               item.refNo || item['Ref No'] || item.reference_no || '',
+          description: item.description || item.Description || item['Product Description'] || '',
+          principal: item.principal || item.Principal || item['Principal Company'] || '',
+          category: item.category || item.Category || '',
+          sub_category: item.sub_category || item['Sub Category'] || item.subCategory || '',
+          price: parseFloat(item.price || item.Price || item['Product Price'] || '0'),
+          branch: item.branch || item.Branch || item['Branch/Division'] || '',
+          status: item.status || item.Status || 'Active',
+          assigned_to: item.assigned_to || item['Assigned To'] || item.assignedTo || 'Hari Kumar K, Prashanth Sandily',
+          image_file_url: item.image_file_url || item['Image File URL'] || item.imageFileUrl || item['Image URL'] || '',
+          company_id: user.company_id
+        }
+      })
+      
+      let successCount = 0
+      let failCount = 0
+      
+      console.log("Processed products for import:", productsToImport.length)
+      
+      // Load existing products once for duplicate checking
+      const existingResponse = await fetch(`/api/products?companyId=${user.company_id}`)
+      let existingProducts = []
+      if (existingResponse.ok) {
+        const existingData = await existingResponse.json()
+        existingProducts = existingData.map((product: any) => ({
+          productName: product.product_name,
+          refNo: product.product_reference_no || '',
+        }))
+      }
+      
+      console.log("Existing products for duplicate check:", existingProducts.length)
+      
+      // Import products one by one with progress updates
+      for (let i = 0; i < productsToImport.length; i++) {
+        const product = productsToImport[i]
+        
+        // Update progress
+        setImportProgress({ current: i + 1, total: productsToImport.length })
+        
+        if (!product.product_name || product.product_name.trim() === '') {
+          console.log(`Skipping row ${i + 2} with no product name:`, product)
+          failCount++
+          continue
+        }
+
+        // Check for duplicates based on product name + reference ID combination
+        const isDuplicate = existingProducts.some(existingProduct => {
+          const sameName = existingProduct.productName?.toLowerCase() === product.product_name?.toLowerCase()
+          const sameRefNo = existingProduct.refNo?.toLowerCase() === product.product_reference_no?.toLowerCase()
+          
+          // Consider duplicate if both name and reference number match
+          // If reference number is empty for both, only check name
+          if (!product.product_reference_no?.trim() && !existingProduct.refNo?.trim()) {
+            return sameName
+          }
+          return sameName && sameRefNo
+        })
+
+        if (isDuplicate) {
+          console.log(`Skipping duplicate product: ${product.product_name} (Ref: ${product.product_reference_no})`)
+          failCount++
+          continue
+        }
+        
+        try {
+          console.log("Importing product:", product.product_name)
+          
+          // Download image if URL is provided
+          let productPicture = null
+          if (product.image_file_url && product.image_file_url.trim() !== '') {
+            console.log("Downloading image for:", product.product_name)
+            productPicture = await downloadImageAsBase64(product.image_file_url)
+            if (productPicture) {
+              console.log("Image downloaded successfully for:", product.product_name)
+            } else {
+              console.log("Failed to download image for:", product.product_name)
+            }
+          }
+          
+          // Prepare product data with image
+          const productData = {
+            ...product,
+            product_picture: productPicture,
+            companyId: user.company_id
+          }
+          
+          // Remove image_file_url from the data being sent to API
+          delete productData.image_file_url
+          
+          const response = await fetch('/api/products', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(productData),
+          })
+          
+          if (response.ok) {
+            successCount++
+            console.log(`Successfully imported product: ${product.product_name}`)
+            
+            // Add to existing products list to prevent duplicates within this import batch
+            existingProducts.push({
+              productName: product.product_name,
+              refNo: product.product_reference_no || ''
+            })
+          } else {
+            const errorData = await response.text()
+            console.error(`Failed to import product ${product.product_name}:`, errorData)
+            failCount++
+          }
+          
+          // Small delay to prevent overwhelming the server
+          await new Promise(resolve => setTimeout(resolve, 100))
+          
+        } catch (error) {
+          console.error(`Error importing product ${product.product_name}:`, error)
+          failCount++
+        }
+      }
+      
+      // Clear loading state and close modal
+      setIsImporting(false)
+      setImportProgress({ current: 0, total: 0 })
+      setIsDataImportModalOpen(false)
+      
+      toast({
+        title: "Import completed",
+        description: `Successfully imported ${successCount} of ${data.length} products. ${failCount > 0 ? `${failCount} skipped/failed (duplicates or errors).` : ''}`
+      })
+      
+      // Reload products to show the imported ones
+      await loadProducts()
+      
+    } catch (error) {
+      console.error('Error during import:', error)
+      
+      // Clear loading state on error
+      setIsImporting(false)
+      setImportProgress({ current: 0, total: 0 })
+      
+      toast({
+        title: "Import failed", 
+        description: "There was an error during the import process. Please try again.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleEditProduct = (product: any) => {
+    setEditingProduct(product)
+    setIsAddProductModalOpen(true)
+  }
+
+  const toggleDescription = (productId: number) => {
+    setExpandedDescriptions(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(productId)) {
+        newSet.delete(productId)
+      } else {
+        newSet.add(productId)
+      }
+      return newSet
+    })
+  }
+
+  const handleImageClick = (imageUrl: string, productName: string) => {
+    setZoomedImage({ url: imageUrl, name: productName })
+  }
+
+  const closeImageZoom = () => {
+    setZoomedImage(null)
   }
 
   const getStatusColor = (status: string) => {
@@ -203,8 +459,8 @@ export function ProductsContent() {
       product.refNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.principal.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesBranch = selectedBranch === "All" || 
-      product.branch.toLowerCase().includes(selectedBranch.toLowerCase())
+    const matchesCategory = selectedCategory === "All" || 
+      product.category === selectedCategory
 
     const matchesPrincipal = selectedPrincipal === "All" || 
       product.principal === selectedPrincipal
@@ -212,7 +468,7 @@ export function ProductsContent() {
     const matchesStatus = selectedStatus === "All" || 
       product.status === selectedStatus
 
-    return matchesSearch && matchesBranch && matchesPrincipal && matchesStatus
+    return matchesSearch && matchesCategory && matchesPrincipal && matchesStatus
   })
 
   return (
@@ -243,40 +499,64 @@ export function ProductsContent() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Products</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <ShoppingCart className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{productsStats.total}</div>
-            <p className="text-xs text-muted-foreground">+{storageService.getStats('products').thisMonthCount} this month</p>
+            <div className="text-2xl font-bold">
+              {isLoadingStats ? (
+                <div className="w-12 h-8 bg-gray-200 animate-pulse rounded"></div>
+              ) : (
+                productsStats.total
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">Total in catalog</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Products</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{productsStats.active}</div>
+            <div className="text-2xl font-bold">
+              {isLoadingStats ? (
+                <div className="w-12 h-8 bg-gray-200 animate-pulse rounded"></div>
+              ) : (
+                productsStats.active
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">{productsStats.total > 0 ? Math.round((productsStats.active / productsStats.total) * 100) : 0}% of catalog</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Product Categories</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <Grid3X3 className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{productsStats.categories}</div>
+            <div className="text-2xl font-bold">
+              {isLoadingStats ? (
+                <div className="w-12 h-8 bg-gray-200 animate-pulse rounded"></div>
+              ) : (
+                productsStats.categories
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">Well organized</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Avg. Product Value</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <IndianRupee className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{productsStats.avgValue.toLocaleString()}</div>
+            <div className="text-2xl font-bold">
+              {isLoadingStats ? (
+                <div className="w-16 h-8 bg-gray-200 animate-pulse rounded"></div>
+              ) : (
+                `₹${productsStats.avgValue.toLocaleString()}`
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">Laboratory equipment</p>
           </CardContent>
         </Card>
@@ -300,26 +580,26 @@ export function ProductsContent() {
                 />
               </div>
             </div>
-            <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Branch/Division" />
-              </SelectTrigger>
-              <SelectContent>
-                {branches.map((branch) => (
-                  <SelectItem key={branch} value={branch}>
-                    {branch}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Select value={selectedPrincipal} onValueChange={setSelectedPrincipal}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Principal" />
               </SelectTrigger>
               <SelectContent>
-                {principals.map((principal) => (
+                {availablePrincipals.map((principal) => (
                   <SelectItem key={principal} value={principal}>
                     {principal}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableCategories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -346,77 +626,221 @@ export function ProductsContent() {
           <CardDescription>Showing {filteredProducts.length} of {productsList.length} products</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Branch/Division</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Principal</TableHead>
-                  <TableHead>Product Name</TableHead>
-                  <TableHead>Ref. No/ID</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Assigned To</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProducts.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell>{product.branch}</TableCell>
-                    <TableCell>{product.category}</TableCell>
-                    <TableCell>{product.principal}</TableCell>
-                    <TableCell className="max-w-xs">
-                      <div className="truncate" title={product.productName}>
-                        {product.productName}
+          <div className="space-y-4">
+            {filteredProducts.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No products found. Click "Add Product" to create your first product.
+              </div>
+            ) : (
+              filteredProducts.map((product) => {
+                console.log('Rendering product:', product)
+                return (
+                  <div
+                    key={product.id}
+                    className="flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-start space-x-4 flex-1">
+                      {/* Product Image */}
+                      <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0 relative cursor-pointer hover:bg-gray-200 transition-colors"
+                           onClick={() => {
+                             if (product.product_picture && 
+                                 product.product_picture !== 'pending_upload' && 
+                                 product.product_picture !== null &&
+                                 product.product_picture.trim() !== '') {
+                               handleImageClick(product.product_picture, product.productName)
+                             }
+                           }}
+                      >
+                        {product.product_picture && 
+                         product.product_picture !== 'pending_upload' && 
+                         product.product_picture !== null &&
+                         product.product_picture.trim() !== '' ? (
+                          <img 
+                            src={product.product_picture} 
+                            alt={product.productName}
+                            className="w-full h-full object-cover hover:opacity-90 transition-opacity"
+                            onError={(e) => {
+                              console.log('Image load error for product:', product.productName)
+                              // If image fails to load, show default icon
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                const icon = parent.querySelector('.default-icon');
+                                if (icon) {
+                                  icon.classList.remove('hidden');
+                                }
+                              }
+                            }}
+                            onLoad={() => {
+                              console.log('Image loaded successfully for product:', product.productName)
+                            }}
+                          />
+                        ) : null}
+                        <Package className={`default-icon w-10 h-10 text-gray-400 ${
+                          product.product_picture && 
+                          product.product_picture !== 'pending_upload' && 
+                          product.product_picture !== null &&
+                          product.product_picture.trim() !== '' 
+                            ? 'hidden' : ''
+                        }`} />
                       </div>
-                    </TableCell>
-                    <TableCell>{product.refNo || "—"}</TableCell>
-                    <TableCell className="font-semibold">{product.price}</TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(product.status)}>{product.status}</Badge>
-                    </TableCell>
-                    <TableCell className="max-w-xs">
-                      <div className="truncate" title={product.assignedTo}>
-                        {product.assignedTo}
+                    
+                      {/* Product Details */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <h3 className="font-semibold text-lg truncate">{product.productName}</h3>
+                          <Badge className={getStatusColor(product.status)}>
+                            {product.status}
+                          </Badge>
+                        </div>
+                        
+                        {/* Principal */}
+                        {product.principal && (
+                          <div className="flex items-center space-x-2 mb-2">
+                            <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full font-medium">
+                              Principal: {product.principal}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {/* Category */}
+                        {product.category && (
+                          <div className="flex items-center space-x-2 mb-2">
+                            <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full font-medium">
+                              Category: {product.category}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {/* Description - Expandable */}
+                        {product.description && (
+                          <div className="mb-2">
+                            <div 
+                              className="text-sm text-gray-600"
+                              style={expandedDescriptions.has(product.id) ? {} : {
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden'
+                              }}
+                            >
+                              {product.description}
+                            </div>
+                            {product.description.length > 150 && (
+                              <button
+                                onClick={() => toggleDescription(product.id)}
+                                className="text-blue-600 hover:text-blue-800 text-sm font-medium mt-1 flex items-center transition-colors"
+                              >
+                                {expandedDescriptions.has(product.id) ? (
+                                  <>
+                                    <ChevronUp className="w-4 h-4 mr-1" />
+                                    Show less
+                                  </>
+                                ) : (
+                                  <>
+                                    <ChevronDown className="w-4 h-4 mr-1" />
+                                    Show more
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Price */}
+                        <div>
+                          <span className="text-lg font-bold text-green-600">
+                            {product.price}
+                          </span>
+                        </div>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-1">
-                        <Button variant="ghost" size="sm">
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          <Edit className="w-4 h-4" />
-                        </Button>
+                    </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-col items-end space-y-2 pt-2">
+                    {/* Assigned To */}
+                    {product.assignedTo && (
+                      <div className="text-right">
+                        <span className="text-xs text-gray-600 font-medium">
+                          Assigned to: {product.assignedTo}
+                        </span>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    )}
+                    
+                    <Button variant="outline" size="sm" onClick={() => handleEditProduct(product)}>
+                      <Edit className="w-4 h-4 mr-1" />
+                      Edit
+                    </Button>
+                  </div>
+                </div>
+                )
+              })
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* AI Product Recommendations Section */}
-      <AIProductRecommendations
+      {/* AI Product Recommendations Section - Temporarily Commented */}
+      {/* <AIProductRecommendations
         currentProduct="LABORATORY FREEZE DRYER/LYOPHILIZER"
         customerType="Research Institution"
         context="cross-sell"
-      />
+      /> */}
 
       {/* AddProductModal component */}
-      <AddProductModal isOpen={isAddProductModalOpen} onClose={() => setIsAddProductModalOpen(false)} onSave={handleSaveProduct} />
+      <AddProductModal 
+        isOpen={isAddProductModalOpen} 
+        onClose={() => {
+          setIsAddProductModalOpen(false)
+          setEditingProduct(null)
+        }} 
+        onSave={handleSaveProduct} 
+        editingProduct={editingProduct}
+      />
       
-      {/* DataImportModal component */}
-      <DataImportModal 
+      {/* ProductsFileImport component */}
+      <ProductsFileImport 
         isOpen={isDataImportModalOpen} 
         onClose={() => setIsDataImportModalOpen(false)}
-        moduleType="products"
         onImport={handleImportData}
+        isImporting={isImporting}
+        importProgress={importProgress}
       />
+
+      {/* Image Zoom Modal */}
+      <Dialog open={!!zoomedImage} onOpenChange={closeImageZoom}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-4 pb-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-lg font-semibold truncate">
+                {zoomedImage?.name}
+              </DialogTitle>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={closeImageZoom}
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+          
+          {zoomedImage && (
+            <div className="p-4 pt-0">
+              <div className="flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden">
+                <img 
+                  src={zoomedImage.url} 
+                  alt={zoomedImage.name}
+                  className="max-w-full max-h-[70vh] object-contain"
+                  style={{ minHeight: '200px' }}
+                />
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -325,12 +325,31 @@ export function CompanyAdminDashboard() {
         // Trigger notification refresh
         window.dispatchEvent(new CustomEvent('refreshNotifications'))
       } else {
-        throw new Error('Failed to create user')
+        // Get the specific error message from the API response
+        const errorData = await response.json()
+        const errorMessage = errorData.error || 'Failed to create user'
+        
+        // Provide more user-friendly error messages
+        let userFriendlyMessage = errorMessage
+        
+        if (errorMessage.toLowerCase().includes('duplicate') || 
+            errorMessage.toLowerCase().includes('already exists') ||
+            errorMessage.toLowerCase().includes('unique constraint') ||
+            errorMessage.toLowerCase().includes('violates unique constraint') ||
+            errorMessage.toLowerCase().includes('users_email_key')) {
+          userFriendlyMessage = 'A user with this email address already exists. Please use a different email.'
+        } else if (errorMessage.toLowerCase().includes('maximum user limit')) {
+          userFriendlyMessage = 'Your company has reached the maximum number of users allowed. Please upgrade your plan or remove inactive users.'
+        } else if (errorMessage.toLowerCase().includes('invalid email')) {
+          userFriendlyMessage = 'Please enter a valid email address.'
+        }
+        
+        throw new Error(userFriendlyMessage)
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to create user",
+        description: error instanceof Error ? error.message : "Failed to create user",
         variant: "destructive"
       })
     } finally {
@@ -394,9 +413,24 @@ export function CompanyAdminDashboard() {
         window.dispatchEvent(new CustomEvent('refreshNotifications'))
       } else {
         const errorData = await response.json()
+        const errorMessage = errorData.error || 'Failed to update user'
+        
+        // Provide more user-friendly error messages
+        let userFriendlyMessage = errorMessage
+        
+        if (errorMessage.toLowerCase().includes('duplicate') || 
+            errorMessage.toLowerCase().includes('already exists') ||
+            errorMessage.toLowerCase().includes('unique constraint') ||
+            errorMessage.toLowerCase().includes('violates unique constraint') ||
+            errorMessage.toLowerCase().includes('users_email_key')) {
+          userFriendlyMessage = 'A user with this email address already exists. Please use a different email.'
+        } else if (errorMessage.toLowerCase().includes('invalid email')) {
+          userFriendlyMessage = 'Please enter a valid email address.'
+        }
+        
         toast({
           title: "Error",
-          description: errorData.error || "Failed to update user",
+          description: userFriendlyMessage,
           variant: "destructive"
         })
       }
@@ -404,7 +438,7 @@ export function CompanyAdminDashboard() {
       console.error('Update user error:', error)
       toast({
         title: "Error",
-        description: "Failed to update user",
+        description: error instanceof Error ? error.message : "Failed to update user",
         variant: "destructive"
       })
     } finally {

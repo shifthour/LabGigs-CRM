@@ -237,6 +237,10 @@ export function AddAccountModal({ isOpen, onClose }: AddAccountModalProps) {
                   <Input id="website" type="url" placeholder="https://" />
                 </div>
                 <div>
+                  <Label htmlFor="address">Address</Label>
+                  <Textarea id="address" placeholder="Enter complete address" rows={3} />
+                </div>
+                <div>
                   <Label htmlFor="parentAccount">Parent Account</Label>
                   <Select>
                     <SelectTrigger>
