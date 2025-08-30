@@ -17,18 +17,13 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = (page - 1) * limit
     
-    if (!companyId) {
-      return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
-    }
-    
-    // Build query
+    // Build query - no company_id filtering, show ALL accounts
     let query = supabase
       .from('accounts')
       .select(`
         *,
         owner:owner_id(id, full_name, email)
       `, { count: 'exact' })
-      .eq('company_id', companyId)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
     

@@ -80,8 +80,8 @@ export function OpportunitiesContent() {
 
   const loadDeals = async () => {
     try {
-      const companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
-      const response = await fetch(`/api/deals?companyId=${companyId}`)
+      // Load ALL deals without any filtering
+      const response = await fetch(`/api/deals`)
       
       if (response.ok) {
         const data = await response.json()

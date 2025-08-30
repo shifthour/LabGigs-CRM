@@ -49,8 +49,8 @@ export function ProductsContent() {
 
   const loadProducts = async () => {
     try {
-      const companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
-      const response = await fetch(`/api/products?companyId=${companyId}`)
+      // Load ALL products without any filtering
+      const response = await fetch(`/api/products`)
       
       if (!response.ok) {
         console.error('Failed to load products')

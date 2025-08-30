@@ -8,17 +8,10 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams
-    const companyId = searchParams.get('companyId')
-
-    if (!companyId) {
-      return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
-    }
-
+    // Get ALL products without filtering
     const { data: products, error } = await supabase
       .from('products')
       .select('*')
-      .eq('company_id', companyId)
       .order('created_at', { ascending: false })
 
     if (error) {

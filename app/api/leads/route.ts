@@ -8,17 +8,10 @@ const supabase = createClient(
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const companyId = searchParams.get('companyId')
-
-    if (!companyId) {
-      return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
-    }
-
+    // Get ALL leads without filtering by company_id
     const { data: leads, error } = await supabase
       .from('leads')
       .select('*')
-      .eq('company_id', companyId)
       .order('created_at', { ascending: false })
 
     if (error) {

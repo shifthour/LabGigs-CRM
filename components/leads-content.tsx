@@ -54,8 +54,8 @@ export function LeadsContent() {
 
   const loadLeads = async () => {
     try {
-      const companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
-      const response = await fetch(`/api/leads?companyId=${companyId}`)
+      // Load ALL leads without any filtering
+      const response = await fetch(`/api/leads`)
       
       if (response.ok) {
         const apiLeads = await response.json()

@@ -112,25 +112,10 @@ export function AccountsContent() {
 
   const loadAccountsFromAPI = async () => {
     try {
-      // Get current user to find company ID, with fallback
-      const storedUser = localStorage.getItem('user')
-      let companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
+      console.log("Loading all accounts from database...")
       
-      if (storedUser) {
-        try {
-          const user = JSON.parse(storedUser)
-          if (user.company_id) {
-            companyId = user.company_id
-          }
-        } catch (e) {
-          console.log("Error parsing user data, using default company ID")
-        }
-      }
-      
-      console.log("Loading accounts for company:", companyId)
-      
-      // Fetch accounts from API with cache busting
-      const response = await fetch(`/api/accounts?companyId=${companyId}&limit=1000&_t=${Date.now()}`)
+      // Fetch ALL accounts from API without any filtering
+      const response = await fetch(`/api/accounts?limit=1000&_t=${Date.now()}`)
       if (!response.ok) {
         throw new Error(`Failed to fetch accounts: ${response.status}`)
       }

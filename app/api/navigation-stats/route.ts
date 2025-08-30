@@ -8,14 +8,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const companyId = searchParams.get('companyId')
-    
-    if (!companyId) {
-      return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
-    }
-
-    // Fetch counts from all tables in parallel
+    // Fetch ALL counts from all tables without filtering
     const [
       leadsResult,
       contactsResult,
@@ -29,11 +22,11 @@ export async function GET(request: NextRequest) {
       complaintsResult,
       activitiesResult
     ] = await Promise.all([
-      supabase.from('leads').select('id', { count: 'exact', head: true }).eq('company_id', companyId),
-      supabase.from('contacts').select('id', { count: 'exact', head: true }).eq('company_id', companyId),
-      supabase.from('accounts').select('id', { count: 'exact', head: true }).eq('company_id', companyId),
-      supabase.from('deals').select('id', { count: 'exact', head: true }).eq('company_id', companyId),
-      supabase.from('products').select('id', { count: 'exact', head: true }).eq('company_id', companyId),
+      supabase.from('leads').select('id', { count: 'exact', head: true }),
+      supabase.from('contacts').select('id', { count: 'exact', head: true }),
+      supabase.from('accounts').select('id', { count: 'exact', head: true }),
+      supabase.from('deals').select('id', { count: 'exact', head: true }),
+      supabase.from('products').select('id', { count: 'exact', head: true }),
       // Add other tables as they become available
       Promise.resolve({ count: 0 }), // quotations - not implemented yet
       Promise.resolve({ count: 0 }), // sales_orders - not implemented yet  

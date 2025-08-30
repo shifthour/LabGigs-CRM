@@ -8,19 +8,11 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const companyId = searchParams.get('companyId')
-    
-    // Build query
+    // Get ALL deals without filtering
     let query = supabase
       .from('deals')
       .select('*')
       .order('created_at', { ascending: false })
-    
-    // Filter by company if provided
-    if (companyId) {
-      query = query.eq('company_id', companyId)
-    }
 
     const { data: deals, error } = await query
 

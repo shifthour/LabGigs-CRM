@@ -51,11 +51,9 @@ export function Sidebar() {
   
   const loadNavigationStats = async () => {
     try {
-      const companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
-      
-      // Check cache first
-      const cachedStats = localStorage.getItem(`navigation-stats-${companyId}`)
-      const cacheTime = localStorage.getItem(`navigation-stats-time-${companyId}`)
+      // Check cache first (without company ID)
+      const cachedStats = localStorage.getItem(`navigation-stats`)
+      const cacheTime = localStorage.getItem(`navigation-stats-time`)
       
       if (cachedStats && cacheTime) {
         const cacheAge = Date.now() - parseInt(cacheTime)
@@ -69,8 +67,8 @@ export function Sidebar() {
         }
       }
       
-      // Fetch fresh data
-      const response = await fetch(`/api/navigation-stats?companyId=${companyId}`)
+      // Fetch fresh data - ALL counts without filtering
+      const response = await fetch(`/api/navigation-stats`)
       
       if (response.ok) {
         const data = await response.json()
@@ -78,8 +76,8 @@ export function Sidebar() {
         setStatsLoaded(true)
         
         // Cache the results for 5 minutes
-        localStorage.setItem(`navigation-stats-${companyId}`, JSON.stringify(data.stats))
-        localStorage.setItem(`navigation-stats-time-${companyId}`, Date.now().toString())
+        localStorage.setItem(`navigation-stats`, JSON.stringify(data.stats))
+        localStorage.setItem(`navigation-stats-time`, Date.now().toString())
       }
     } catch (error) {
       console.error('Error loading navigation stats:', error)

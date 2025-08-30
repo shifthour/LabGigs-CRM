@@ -422,12 +422,10 @@ export function RoleBasedSidebar() {
   
   const loadNavigationStats = async (forceRefresh = false) => {
     try {
-      const companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
-      
       // Check cache first (unless forcing refresh)
       if (!forceRefresh) {
-        const cachedStats = localStorage.getItem(`navigation-stats-${companyId}`)
-        const cacheTime = localStorage.getItem(`navigation-stats-time-${companyId}`)
+        const cachedStats = localStorage.getItem(`navigation-stats`)
+        const cacheTime = localStorage.getItem(`navigation-stats-time`)
         
         if (cachedStats && cacheTime) {
           const cacheAge = Date.now() - parseInt(cacheTime)
@@ -442,8 +440,8 @@ export function RoleBasedSidebar() {
         }
       }
       
-      // Fetch fresh data
-      const response = await fetch(`/api/navigation-stats?companyId=${companyId}`)
+      // Fetch fresh data - ALL counts without filtering
+      const response = await fetch(`/api/navigation-stats`)
       
       if (response.ok) {
         const data = await response.json()
@@ -451,8 +449,8 @@ export function RoleBasedSidebar() {
         setStatsLoaded(true)
         
         // Cache the results
-        localStorage.setItem(`navigation-stats-${companyId}`, JSON.stringify(data.stats))
-        localStorage.setItem(`navigation-stats-time-${companyId}`, Date.now().toString())
+        localStorage.setItem(`navigation-stats`, JSON.stringify(data.stats))
+        localStorage.setItem(`navigation-stats-time`, Date.now().toString())
       }
     } catch (error) {
       console.error('Error loading navigation stats:', error)
