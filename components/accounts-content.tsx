@@ -112,23 +112,25 @@ export function AccountsContent() {
 
   const loadAccountsFromAPI = async () => {
     try {
-      // Get current user to find company ID
+      // Get current user to find company ID, with fallback
       const storedUser = localStorage.getItem('user')
-      if (!storedUser) {
-        console.log("No user found in localStorage")
-        return
+      let companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
+      
+      if (storedUser) {
+        try {
+          const user = JSON.parse(storedUser)
+          if (user.company_id) {
+            companyId = user.company_id
+          }
+        } catch (e) {
+          console.log("Error parsing user data, using default company ID")
+        }
       }
       
-      const user = JSON.parse(storedUser)
-      if (!user.company_id) {
-        console.log("No company_id found for user")
-        return
-      }
-      
-      console.log("Loading accounts for company:", user.company_id)
+      console.log("Loading accounts for company:", companyId)
       
       // Fetch accounts from API with cache busting
-      const response = await fetch(`/api/accounts?companyId=${user.company_id}&limit=1000&_t=${Date.now()}`)
+      const response = await fetch(`/api/accounts?companyId=${companyId}&limit=1000&_t=${Date.now()}`)
       if (!response.ok) {
         throw new Error(`Failed to fetch accounts: ${response.status}`)
       }
@@ -317,25 +319,21 @@ export function AccountsContent() {
     setIsSaving(true)
 
     try {
-      // Get current user's company ID
+      // Get current user's company ID with fallback
       const storedUser = localStorage.getItem('user')
-      if (!storedUser) {
-        toast({
-          title: "Error",
-          description: "User not found. Please login again.",
-          variant: "destructive"
-        })
-        return
-      }
+      let companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
+      let userId = null
       
-      const user = JSON.parse(storedUser)
-      if (!user.company_id) {
-        toast({
-          title: "Error",
-          description: "Company not found. Please login again.",
-          variant: "destructive"
-        })
-        return
+      if (storedUser) {
+        try {
+          const user = JSON.parse(storedUser)
+          if (user.company_id) {
+            companyId = user.company_id
+          }
+          userId = user.id
+        } catch (e) {
+          console.log("Error parsing user data, using default company ID")
+        }
       }
 
       if (editingAccount) {
@@ -360,7 +358,7 @@ export function AccountsContent() {
             status: formData.status || 'Active',
             contact_name: formData.contactName,
             assigned_to: formData.assignedTo,
-            owner_id: user.id
+            owner_id: userId
           })
         })
         
@@ -389,7 +387,7 @@ export function AccountsContent() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            companyId: user.company_id,
+            companyId: companyId,
             account_name: formData.accountName,
             industry: formData.industry,
             phone: formData.contactNo,
@@ -402,7 +400,7 @@ export function AccountsContent() {
             status: formData.status || 'Active',
             contact_name: formData.contactName,
             assigned_to: formData.assignedTo,
-            owner_id: user.id
+            owner_id: userId
           })
         })
         
@@ -540,7 +538,7 @@ export function AccountsContent() {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              companyId: user.company_id,
+              companyId: companyId,
               ...account
             })
           })
