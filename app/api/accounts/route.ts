@@ -4,10 +4,18 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing Supabase environment variables')
+}
+
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('Accounts API GET request received')
+    console.log('Supabase URL:', supabaseUrl ? 'Set' : 'Missing')
+    console.log('Supabase Key:', supabaseServiceKey ? 'Set' : 'Missing')
+    
     const { searchParams } = new URL(request.url)
     const companyId = searchParams.get('companyId')
     const search = searchParams.get('search')
@@ -17,13 +25,11 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = (page - 1) * limit
     
-    // Build query - no company_id filtering, show ALL accounts
+    // Build query - no company_id filtering, show ALL accounts  
+    // Try without the join first to see if that's the issue
     let query = supabase
       .from('accounts')
-      .select(`
-        *,
-        owner:owner_id(id, full_name, email)
-      `, { count: 'exact' })
+      .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
     
@@ -42,9 +48,15 @@ export async function GET(request: NextRequest) {
     
     const { data, error, count } = await query
     
+    console.log('Query executed. Error:', error, 'Data count:', data?.length, 'Total count:', count)
+    
     if (error) {
       console.error('Error fetching accounts:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ 
+        error: error.message,
+        accounts: [],
+        total: 0
+      }, { status: 500 })
     }
     
     return NextResponse.json({
