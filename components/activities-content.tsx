@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,66 +9,116 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Search, Download, Eye, Edit, Activity, Phone, Mail, Calendar, FileText } from "lucide-react"
 
-const activities = [
-  {
-    id: "ACT-001",
-    date: "20/07/2025",
-    type: "Call",
-    account: "TSAR Labcare",
-    linkTo: "Lead",
-    contactName: "Mr. Mahesh",
-    productService: "TRICOLOR MULTICHANNEL FIBRINOMETER",
-    status: "Completed",
-    assignedTo: "Pauline",
-    notes: "Discussed product specifications and pricing",
-  },
-  {
-    id: "ACT-002",
-    date: "19/07/2025",
-    type: "Email",
-    account: "Eurofins Advinus",
-    linkTo: "Opportunity",
-    contactName: "Dr. Research Head",
-    productService: "LABORATORY FREEZE DRYER",
-    status: "Sent",
-    assignedTo: "Pauline",
-    notes: "Sent detailed quotation and technical specifications",
-  },
-  {
-    id: "ACT-003",
-    date: "18/07/2025",
-    type: "Meeting",
-    account: "ASN Fuels Private",
-    linkTo: "Account",
-    contactName: "Mr. Naveen G",
-    productService: "LAF-02 Application",
-    status: "Scheduled",
-    assignedTo: "Pauline",
-    notes: "Site visit scheduled for product demonstration",
-  },
-  {
-    id: "ACT-004",
-    date: "17/07/2025",
-    type: "Task",
-    account: "Kerala Agricultural University",
-    linkTo: "Installation",
-    contactName: "Dr. Department Head",
-    productService: "ND 1000 Spectrophotometer",
-    status: "In Progress",
-    assignedTo: "Hari Kumar K",
-    notes: "Installation planning and preparation",
-  },
-]
+interface Activity {
+  id: string
+  date: string
+  type: string
+  account: string
+  linkTo: string
+  contactName: string
+  productService: string
+  status: string
+  assignedTo: string
+  notes: string
+}
 
 const activityTypes = ["All", "Call", "Email", "Meeting", "Task", "Follow-up", "Demo"]
 const statuses = ["All", "Completed", "In Progress", "Scheduled", "Cancelled", "Sent"]
 const linkTypes = ["All", "Lead", "Opportunity", "Account", "Installation", "Complaint", "AMC"]
 
 export function ActivitiesContent() {
+  const [activities, setActivities] = useState<Activity[]>([])
+  const [statsLoaded, setStatsLoaded] = useState(false)
+  const [activityStats, setActivityStats] = useState({
+    total: 0,
+    completedToday: 0,
+    scheduled: 0,
+    overdue: 0
+  })
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedType, setSelectedType] = useState("All")
   const [selectedStatus, setSelectedStatus] = useState("All")
   const [selectedLinkType, setSelectedLinkType] = useState("All")
+
+  useEffect(() => {
+    loadActivities()
+  }, [])
+
+  const loadActivities = async () => {
+    try {
+      // Generate activities from leads and deals data
+      const [leadsRes, dealsRes] = await Promise.all([
+        fetch('/api/leads'),
+        fetch('/api/deals')
+      ])
+      
+      const leadsData = await leadsRes.json()
+      const dealsData = await dealsRes.json()
+      
+      const leads = leadsData.leads || []
+      const deals = dealsData.deals || []
+      
+      // Create activities from leads
+      const leadActivities = leads.map((lead: any, index: number) => ({
+        id: `LEAD-${lead.id.slice(0, 8)}`,
+        date: new Date(lead.created_at).toLocaleDateString('en-GB'),
+        type: lead.lead_status === 'New' ? 'Lead Created' : 'Lead Updated',
+        account: lead.account_name,
+        linkTo: 'Lead',
+        contactName: lead.contact_name || 'Unknown',
+        productService: lead.product_name || 'General Inquiry',
+        status: lead.lead_status === 'Qualified' ? 'Completed' : 
+                lead.lead_status === 'New' ? 'In Progress' : 'Scheduled',
+        assignedTo: lead.assigned_to || 'Unassigned',
+        notes: lead.notes || 'Lead activity'
+      }))
+      
+      // Create activities from deals
+      const dealActivities = deals.map((deal: any, index: number) => ({
+        id: `DEAL-${deal.id.slice(0, 8)}`,
+        date: new Date(deal.created_at).toLocaleDateString('en-GB'),
+        type: 'Deal Created',
+        account: deal.account_name,
+        linkTo: 'Opportunity',
+        contactName: deal.contact_person,
+        productService: deal.product,
+        status: deal.status === 'Active' ? 'In Progress' : 
+                deal.status === 'Won' ? 'Completed' : 'Scheduled',
+        assignedTo: deal.assigned_to || 'Unassigned',
+        notes: deal.last_activity || 'Deal activity'
+      }))
+      
+      const allActivities = [...leadActivities, ...dealActivities]
+        .sort((a, b) => new Date(b.date.split('/').reverse().join('-')).getTime() - 
+                       new Date(a.date.split('/').reverse().join('-')).getTime())
+      
+      setActivities(allActivities)
+      
+      // Calculate stats
+      const today = new Date().toLocaleDateString('en-GB')
+      const completedToday = allActivities.filter(act => 
+        act.date === today && act.status === 'Completed'
+      ).length
+      
+      const scheduled = allActivities.filter(act => act.status === 'Scheduled').length
+      const overdue = allActivities.filter(act => {
+        const actDate = new Date(act.date.split('/').reverse().join('-'))
+        return actDate < new Date() && act.status !== 'Completed'
+      }).length
+      
+      setActivityStats({
+        total: allActivities.length,
+        completedToday,
+        scheduled,
+        overdue
+      })
+      setStatsLoaded(true)
+      
+    } catch (error) {
+      console.error('Error loading activities:', error)
+      setStatsLoaded(true)
+    }
+  }
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -129,8 +179,8 @@ export function ActivitiesContent() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,247</div>
-            <p className="text-xs text-muted-foreground">+45 this week</p>
+            <div className="text-2xl font-bold">{!statsLoaded ? "..." : activityStats.total}</div>
+            <p className="text-xs text-muted-foreground">From leads and deals</p>
           </CardContent>
         </Card>
         <Card>
@@ -139,8 +189,8 @@ export function ActivitiesContent() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">23</div>
-            <p className="text-xs text-muted-foreground">Great progress!</p>
+            <div className="text-2xl font-bold">{!statsLoaded ? "..." : activityStats.completedToday}</div>
+            <p className="text-xs text-muted-foreground">Activities completed today</p>
           </CardContent>
         </Card>
         <Card>
@@ -149,8 +199,8 @@ export function ActivitiesContent() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">18</div>
-            <p className="text-xs text-muted-foreground">Upcoming activities</p>
+            <div className="text-2xl font-bold">{!statsLoaded ? "..." : activityStats.scheduled}</div>
+            <p className="text-xs text-muted-foreground">Scheduled activities</p>
           </CardContent>
         </Card>
         <Card>
@@ -159,7 +209,7 @@ export function ActivitiesContent() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">5</div>
+            <div className="text-2xl font-bold">{!statsLoaded ? "..." : activityStats.overdue}</div>
             <p className="text-xs text-muted-foreground">Need attention</p>
           </CardContent>
         </Card>

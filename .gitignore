@@ -19,6 +19,11 @@ yarn-error.log*
 # env files
 .env*
 
+# test files with credentials
+test-*.js
+run-sql.js
+add-*.js
+
 # vercel
 .vercel
 

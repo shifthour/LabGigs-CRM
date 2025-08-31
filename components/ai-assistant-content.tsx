@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -49,40 +49,95 @@ export function AIAssistantContent() {
     }
   ]
 
-  const insights = [
-    {
-      type: "opportunity",
-      title: "High-value opportunity detected",
-      description: "TSAR Labcare showing strong buying signals - 92% close probability",
-      action: "Prepare Proposal",
-      icon: TrendingUp,
-      color: "text-green-600"
-    },
-    {
-      type: "risk",
-      title: "At-risk account",
-      description: "No engagement from Kerala Agricultural University in 30 days",
-      action: "Schedule Call",
-      icon: Users,
-      color: "text-red-600"
-    },
-    {
-      type: "optimization",
-      title: "Meeting optimization",
-      description: "Your Tuesday meetings can be combined to save 2 hours",
-      action: "Optimize Schedule",
-      icon: Calendar,
-      color: "text-blue-600"
-    },
-    {
-      type: "lead",
-      title: "Warm lead detected",
-      description: "Eurofins has visited pricing page 5 times this week",
-      action: "Contact Now",
-      icon: Target,
-      color: "text-purple-600"
+  const [insights, setInsights] = useState<any[]>([])
+  const [statsLoaded, setStatsLoaded] = useState(false)
+
+  useEffect(() => {
+    loadRealInsights()
+  }, [])
+
+  const loadRealInsights = async () => {
+    try {
+      const [leadsRes, dealsRes, accountsRes] = await Promise.all([
+        fetch('/api/leads'),
+        fetch('/api/deals'),
+        fetch('/api/accounts')
+      ])
+      
+      const leadsData = await leadsRes.json()
+      const dealsData = await dealsRes.json()
+      const accountsData = await accountsRes.json()
+      
+      const leads = leadsData.leads || []
+      const deals = dealsData.deals || []
+      const accounts = accountsData.accounts || []
+      
+      const realInsights = []
+      
+      // High probability deals
+      const highProbDeals = deals.filter((deal: any) => deal.probability >= 80)
+      if (highProbDeals.length > 0) {
+        realInsights.push({
+          type: "opportunity",
+          title: "High-value opportunity detected",
+          description: `${highProbDeals[0].account_name} showing strong buying signals - ${highProbDeals[0].probability}% close probability`,
+          action: "Prepare Proposal",
+          icon: TrendingUp,
+          color: "text-green-600"
+        })
+      }
+      
+      // Stale leads (no recent activity)
+      const staleLeads = leads.filter((lead: any) => {
+        const leadDate = new Date(lead.created_at)
+        const daysSince = Math.floor((Date.now() - leadDate.getTime()) / (1000 * 60 * 60 * 24))
+        return daysSince > 7 && lead.lead_status === 'New'
+      })
+      if (staleLeads.length > 0) {
+        realInsights.push({
+          type: "risk",
+          title: "Stale leads detected",
+          description: `${staleLeads.length} leads have no follow-up activity for over 7 days`,
+          action: "Schedule Follow-up",
+          icon: Users,
+          color: "text-red-600"
+        })
+      }
+      
+      // Total pipeline value insight
+      const totalValue = deals.reduce((sum: number, deal: any) => sum + (deal.value || 0), 0)
+      if (totalValue > 0) {
+        realInsights.push({
+          type: "optimization",
+          title: "Pipeline value analysis",
+          description: `Current pipeline worth ₹${(totalValue / 100000).toFixed(1)}L across ${deals.length} deals`,
+          action: "View Analysis",
+          icon: Calendar,
+          color: "text-blue-600"
+        })
+      }
+      
+      // Recent qualified leads
+      const qualifiedLeads = leads.filter((lead: any) => lead.lead_status === 'Qualified')
+      if (qualifiedLeads.length > 0) {
+        realInsights.push({
+          type: "lead",
+          title: "Qualified leads ready",
+          description: `${qualifiedLeads.length} qualified leads ready for deal conversion`,
+          action: "Convert to Deals",
+          icon: Target,
+          color: "text-purple-600"
+        })
+      }
+      
+      setInsights(realInsights)
+      setStatsLoaded(true)
+      
+    } catch (error) {
+      console.error('Error loading insights:', error)
+      setStatsLoaded(true)
     }
-  ]
+  }
 
   const handleSendMessage = () => {
     if (message.trim()) {
@@ -97,7 +152,7 @@ export function AIAssistantContent() {
       setTimeout(() => {
         setChatHistory(prev => [...prev, {
           role: "assistant",
-          content: "I understand you want to know about lead prioritization. Based on your current pipeline, I recommend focusing on TSAR Labcare (92% close probability) and Eurofins (high engagement score). Would you like me to prepare detailed action plans for these leads?",
+          content: "I understand you want to know about lead prioritization. Based on your current pipeline data, I can see your qualified leads and active deals. Would you like me to analyze your highest probability deals or suggest follow-up actions for recent leads?",
           timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
         }])
       }, 1000)
@@ -180,13 +235,13 @@ export function AIAssistantContent() {
                 </div>
                 <div className="flex flex-wrap gap-2 mt-2">
                   <Badge variant="outline" className="cursor-pointer hover:bg-gray-100">
-                    What are my top leads?
+                    Show my qualified leads
                   </Badge>
                   <Badge variant="outline" className="cursor-pointer hover:bg-gray-100">
-                    Prepare for today's meetings
+                    Analyze deal pipeline
                   </Badge>
                   <Badge variant="outline" className="cursor-pointer hover:bg-gray-100">
-                    Email draft for follow-up
+                    Suggest follow-up actions
                   </Badge>
                 </div>
               </div>

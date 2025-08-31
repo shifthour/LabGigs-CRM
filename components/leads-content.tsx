@@ -481,7 +481,34 @@ export function LeadsContent() {
       source: lead.lead_source,
       source_lead_id: lead.id,
       last_activity: 'Created from qualified lead',
-      notes: `Converted from lead: ${lead.id}. Original notes: ${lead.notes || 'None'}`
+      notes: `Converted from lead: ${lead.id}. Original notes: ${lead.notes || 'None'}`,
+      
+      // Copy ALL lead data - contact information
+      phone: lead.phone,
+      email: lead.email,
+      whatsapp: lead.whatsapp,
+      
+      // Copy lead relations
+      product_id: lead.product_id,
+      account_id: lead.account_id,
+      contact_id: lead.contact_id,
+      
+      // Copy location information
+      location: lead.location,
+      city: lead.city,
+      state: lead.state,
+      department: lead.department,
+      
+      // Copy lead tracking and dates
+      lead_date: lead.lead_date,
+      closing_date: lead.closing_date,
+      next_followup_date: lead.next_followup_date,
+      buyer_ref: lead.buyer_ref,
+      
+      // Copy financial details
+      budget: lead.budget,
+      quantity: lead.quantity,
+      price_per_unit: lead.price_per_unit
     }
 
     const response = await fetch('/api/deals', {
