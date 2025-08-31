@@ -33,6 +33,7 @@ import { AIEmailGenerator } from "@/components/ai-email-generator"
 import { AIProductRecommendations } from "@/components/ai-product-recommendations"
 import { DataImportModal } from "@/components/data-import-modal"
 import { AIInsightsService, type OpportunityData, type AIInsight } from "@/lib/ai-services"
+import { AIDealIntelligenceCard } from "@/components/ai-deals-intelligence-card"
 import { useToast } from "@/hooks/use-toast"
 import storageService from "@/lib/localStorage-service"
 
@@ -77,6 +78,7 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
 export function OpportunitiesContent() {
   const { toast } = useToast()
   const [deals, setDeals] = useState<Deal[]>([])
+  const [accounts, setAccounts] = useState<any[]>([])
   const [statsLoaded, setStatsLoaded] = useState(false)
   const [dealsStats, setDealsStats] = useState({
     total: 0,
@@ -99,14 +101,22 @@ export function OpportunitiesContent() {
 
   const loadDeals = async () => {
     try {
-      // Load ALL deals without any filtering
-      const response = await fetch(`/api/deals`)
+      // Load ALL deals and accounts without any filtering - real Supabase data only
+      const [dealsResponse, accountsResponse] = await Promise.all([
+        fetch(`/api/deals`),
+        fetch(`/api/accounts`)
+      ])
       
-      if (response.ok) {
-        const data = await response.json()
+      if (dealsResponse.ok) {
+        const data = await dealsResponse.json()
         const dealsArray = data.deals || []
         console.log("loadDeals - API deals:", dealsArray)
         setDeals(dealsArray)
+        
+        if (accountsResponse.ok) {
+          const accountsData = await accountsResponse.json()
+          setAccounts(accountsData.accounts || [])
+        }
         
         // Calculate stats
         const thisMonth = dealsArray.filter((deal: Deal) => 
@@ -780,6 +790,9 @@ export function OpportunitiesContent() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* AI Intelligence Section - Real-time revenue analysis */}
+      <AIDealIntelligenceCard deals={deals} accounts={accounts} />
 
       {/* Import Modal */}
       <DataImportModal

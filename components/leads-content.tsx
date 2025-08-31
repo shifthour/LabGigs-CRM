@@ -10,6 +10,8 @@ import { exportToExcel, formatDateForExcel } from "@/lib/excel-export"
 import { AILeadScore } from "@/components/ai-lead-score"
 import { AIEmailGenerator } from "@/components/ai-email-generator"
 import { AIRecommendationService, type LeadData } from "@/lib/ai-services"
+import AgenticAIService from "@/lib/agentic-ai-service"
+import { AILeadIntelligenceCard } from "@/components/ai-lead-intelligence-card"
 import { DataImportModal } from "@/components/data-import-modal"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -788,56 +790,8 @@ export function LeadsContent() {
         </CardContent>
       </Card>
 
-      {/* AI Tools Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {leadsList.length > 0 && <AIEmailGenerator lead={leadsList[0] as LeadData} context="follow-up" />}
-
-        <Card className="border-l-4 border-l-green-500">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <div className="p-2 rounded-lg bg-gradient-to-r from-green-500 to-green-600 mr-3">
-                <Zap className="w-5 h-5 text-white" />
-              </div>
-              AI Lead Intelligence
-            </CardTitle>
-            <CardDescription>Advanced insights and next best actions for your leads</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {leadsList.length > 0 ? leadsList.slice(0, 2).map((lead, index) => {
-              const nextAction = AIRecommendationService.getNextBestAction(lead as LeadData)
-              return (
-                <div key={lead.id} className="p-3 border rounded-lg">
-                  <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-medium text-sm">{lead.leadName}</h4>
-                    <AILeadScore lead={lead as LeadData} />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-start space-x-2">
-                      <Target className="w-4 h-4 text-green-600 mt-0.5" />
-                      <div className="text-xs">
-                        <p className="font-medium text-green-800 mb-1">{nextAction.title}</p>
-                        <p className="text-gray-600">{nextAction.description}</p>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-500">
-                        Confidence: {Math.round(nextAction.confidence * 100)}%
-                      </span>
-                      <Button size="sm" variant="outline">
-                        Take Action
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )
-            }) : (
-              <div className="text-center text-gray-500 py-4">
-                No leads available for insights
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* AI Intelligence Section - Real-time analysis using agentic AI */}
+      <AILeadIntelligenceCard leads={leadsList} />
 
       {/* Import Modal */}
       <DataImportModal

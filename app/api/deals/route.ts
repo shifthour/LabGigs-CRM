@@ -97,6 +97,31 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    // Auto-create activity if next_followup_date is set
+    if (deal.next_followup_date && deal.contact_person) {
+      try {
+        await supabase.from('activities').insert({
+          company_id: deal.company_id,
+          activity_type: deal.stage === 'Proposal' ? 'demo' : 'call',
+          title: `Follow up ${deal.stage} stage with ${deal.contact_person}`,
+          description: `${deal.stage} stage: ${deal.product} deal worth ₹${deal.value?.toLocaleString()}`,
+          entity_type: 'deal',
+          entity_id: deal.id,
+          entity_name: deal.account_name,
+          contact_name: deal.contact_person,
+          contact_phone: deal.phone,
+          contact_email: deal.email,
+          scheduled_date: deal.next_followup_date,
+          due_date: deal.next_followup_date,
+          priority: deal.probability >= 80 ? 'high' : 'medium',
+          assigned_to: deal.assigned_to,
+          status: 'pending'
+        })
+      } catch (activityError) {
+        console.error('Error auto-creating deal activity:', activityError)
+      }
+    }
+
     return NextResponse.json({ deal })
   } catch (error) {
     console.error('Unexpected error:', error)

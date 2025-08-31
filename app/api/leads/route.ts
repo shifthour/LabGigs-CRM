@@ -61,6 +61,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create lead' }, { status: 500 })
     }
 
+    // Auto-create activity if next_followup_date is set
+    if (newLead.next_followup_date && newLead.contact_name) {
+      try {
+        await supabase.from('activities').insert({
+          company_id: companyId,
+          user_id: leadData.assigned_to_user_id,
+          activity_type: 'call',
+          title: `Follow up with ${newLead.contact_name}`,
+          description: `Follow up on ${newLead.product_name} inquiry from ${newLead.account_name}`,
+          entity_type: 'lead',
+          entity_id: newLead.id,
+          entity_name: newLead.account_name,
+          contact_name: newLead.contact_name,
+          contact_phone: newLead.phone,
+          contact_email: newLead.email,
+          scheduled_date: newLead.next_followup_date,
+          due_date: newLead.next_followup_date,
+          priority: newLead.priority === 'High' ? 'high' : 'medium',
+          assigned_to: newLead.assigned_to,
+          status: 'pending'
+        })
+      } catch (activityError) {
+        console.error('Error auto-creating activity:', activityError)
+      }
+    }
+
     return NextResponse.json(newLead, { status: 201 })
   } catch (error) {
     console.error('Error in leads POST:', error)
@@ -105,6 +131,32 @@ export async function PUT(request: NextRequest) {
 
     if (!updatedLead) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    }
+
+    // Auto-create activity if next_followup_date is set and this is a new follow-up date
+    if (updatedLead.next_followup_date && updatedLead.contact_name && leadData.next_followup_date) {
+      try {
+        await supabase.from('activities').insert({
+          company_id: companyId,
+          user_id: leadData.assigned_to_user_id,
+          activity_type: updatedLead.lead_status === 'Contacted' ? 'follow-up' : 'call',
+          title: `Follow up with ${updatedLead.contact_name}`,
+          description: `${updatedLead.lead_status} lead: ${updatedLead.product_name} inquiry from ${updatedLead.account_name}`,
+          entity_type: 'lead',
+          entity_id: updatedLead.id,
+          entity_name: updatedLead.account_name,
+          contact_name: updatedLead.contact_name,
+          contact_phone: updatedLead.phone,
+          contact_email: updatedLead.email,
+          scheduled_date: updatedLead.next_followup_date,
+          due_date: updatedLead.next_followup_date,
+          priority: updatedLead.priority === 'High' ? 'high' : 'medium',
+          assigned_to: updatedLead.assigned_to,
+          status: 'pending'
+        })
+      } catch (activityError) {
+        console.error('Error auto-creating follow-up activity:', activityError)
+      }
     }
 
     return NextResponse.json(updatedLead)

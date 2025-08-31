@@ -51,16 +51,7 @@ import {
 const roleBasedNavigation = {
   "Sales Manager": [
     { name: "Dashboard", href: "/", icon: Home, badge: null, type: "item" },
-    {
-      name: "Activities",
-      icon: Activity,
-      type: "category",
-      children: [
-        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: null },
-        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: null },
-        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: null },
-      ]
-    },
+    { name: "Activities", href: "/activities", icon: Activity, badge: null, type: "item" },
     {
       name: "Sales",
       icon: ShoppingBag,
@@ -124,16 +115,7 @@ const roleBasedNavigation = {
   ],
   "Service Manager": [
     { name: "Dashboard", href: "/", icon: Home, badge: null, type: "item" },
-    {
-      name: "Activities",
-      icon: Activity,
-      type: "category",
-      children: [
-        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: null },
-        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: null },
-        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: null },
-      ]
-    },
+    { name: "Activities", href: "/activities", icon: Activity, badge: null, type: "item" },
     {
       name: "Services",
       icon: Wrench,
@@ -173,16 +155,7 @@ const roleBasedNavigation = {
   ],
   "Marketing Manager": [
     { name: "Dashboard", href: "/", icon: Home, badge: null, type: "item" },
-    {
-      name: "Activities",
-      icon: Activity,
-      type: "category",
-      children: [
-        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: null },
-        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: null },
-        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: null },
-      ]
-    },
+    { name: "Activities", href: "/activities", icon: Activity, badge: null, type: "item" },
     {
       name: "Sales",
       icon: ShoppingBag,
@@ -245,16 +218,7 @@ const roleBasedNavigation = {
   ],
   "Project Manager": [
     { name: "Dashboard", href: "/", icon: Home, badge: null, type: "item" },
-    {
-      name: "Activities",
-      icon: Activity,
-      type: "category",
-      children: [
-        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: null },
-        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: null },
-        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: null },
-      ]
-    },
+    { name: "Activities", href: "/activities", icon: Activity, badge: null, type: "item" },
     {
       name: "Projects",
       icon: Briefcase,
@@ -286,16 +250,7 @@ const roleBasedNavigation = {
   ],
   "Sales Rep": [
     { name: "Dashboard", href: "/", icon: Home, badge: null, type: "item" },
-    {
-      name: "Activities",
-      icon: Activity,
-      type: "category",
-      children: [
-        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: null },
-        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: null },
-        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: null },
-      ]
-    },
+    { name: "Activities", href: "/activities", icon: Activity, badge: null, type: "item" },
     {
       name: "Sales",
       icon: ShoppingBag,
@@ -327,16 +282,7 @@ const roleBasedNavigation = {
   ],
   Admin: [
     { name: "Dashboard", href: "/", icon: Home, badge: null, type: "item" },
-    {
-      name: "Activities",
-      icon: Activity,
-      type: "category",
-      children: [
-        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: null },
-        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: null },
-        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: null },
-      ]
-    },
+    { name: "Activities", href: "/activities", icon: Activity, badge: null, type: "item" },
     {
       name: "Sales",
       icon: ShoppingBag,
