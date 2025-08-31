@@ -51,19 +51,26 @@ export function Sidebar() {
   
   const loadNavigationStats = async () => {
     try {
-      // Check cache first (without company ID)
-      const cachedStats = localStorage.getItem(`navigation-stats`)
-      const cacheTime = localStorage.getItem(`navigation-stats-time`)
+      // Check if this is a page refresh (performance.navigation.type === 1)
+      // or if page was reloaded (F5, Cmd+R)
+      const isPageRefresh = performance.navigation.type === 1 || 
+                           (performance.getEntriesByType('navigation')[0] as any)?.type === 'reload'
       
-      if (cachedStats && cacheTime) {
-        const cacheAge = Date.now() - parseInt(cacheTime)
-        const fiveMinutes = 5 * 60 * 1000
+      // Check cache first (without company ID) - but skip cache on manual refresh
+      if (!isPageRefresh) {
+        const cachedStats = localStorage.getItem(`navigation-stats`)
+        const cacheTime = localStorage.getItem(`navigation-stats-time`)
         
-        if (cacheAge < fiveMinutes) {
-          // Use cached data immediately
-          setNavigationStats(JSON.parse(cachedStats))
-          setStatsLoaded(true)
-          return
+        if (cachedStats && cacheTime) {
+          const cacheAge = Date.now() - parseInt(cacheTime)
+          const fiveMinutes = 5 * 60 * 1000
+          
+          if (cacheAge < fiveMinutes) {
+            // Use cached data immediately
+            setNavigationStats(JSON.parse(cachedStats))
+            setStatsLoaded(true)
+            return
+          }
         }
       }
       
@@ -93,21 +100,8 @@ export function Sidebar() {
   }
   
   const getBadge = (routePath: string) => {
-    if (!statsLoaded) return "..." // Show loading dots
-    
-    switch (routePath) {
-      case "/leads": return navigationStats?.leads ? formatCount(navigationStats.leads) : "0"
-      case "/accounts": return navigationStats?.accounts ? formatCount(navigationStats.accounts) : "0"
-      case "/deals": return navigationStats?.deals ? formatCount(navigationStats.deals) : "0"
-      case "/products": return navigationStats?.products ? formatCount(navigationStats.products) : "0"
-      case "/quotations": return navigationStats?.quotations ? formatCount(navigationStats.quotations) : "0"
-      case "/sales-orders": return navigationStats?.salesOrders ? formatCount(navigationStats.salesOrders) : "0"
-      case "/installations": return navigationStats?.installations ? formatCount(navigationStats.installations) : "0"
-      case "/amc": return navigationStats?.amc ? formatCount(navigationStats.amc) : "0"
-      case "/complaints": return navigationStats?.complaints ? formatCount(navigationStats.complaints) : "0"
-      case "/activities": return navigationStats?.activities ? formatCount(navigationStats.activities) : "0"
-      default: return null
-    }
+    // Badges removed from navigation
+    return null
   }
 
   // Create navigation with dynamic badges
@@ -142,8 +136,8 @@ export function Sidebar() {
       type: "category",
       children: [
         { name: "Products", href: "/products", icon: Package, badge: getBadge("/products") },
-        { name: "Solutions", href: "/solutions", icon: Beaker, badge: "12" },
-        { name: "Doc Library", href: "/doc-library", icon: FolderOpen, badge: "270" },
+        { name: "Solutions", href: "/solutions", icon: Beaker, badge: null },
+        { name: "Doc Library", href: "/doc-library", icon: FolderOpen, badge: null },
         { name: "MIS Reports", href: "/mis-reports", icon: BarChart3, badge: null },
       ]
     },
@@ -152,11 +146,11 @@ export function Sidebar() {
       icon: MessageSquare,
       type: "category",
       children: [
-        { name: "Conversations", href: "/conversations", icon: MessageSquare, badge: "47" },
-        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: "156" },
+        { name: "Conversations", href: "/conversations", icon: MessageSquare, badge: null },
+        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
       ]
     },
-    { name: "Integrations", href: "/integrations", icon: Zap, badge: "8", type: "item" },
+    { name: "Integrations", href: "/integrations", icon: Zap, badge: null, type: "item" },
     { name: "Admin", href: "/admin", icon: Settings, badge: null, type: "item" },
   ]
 

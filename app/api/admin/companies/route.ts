@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/database'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 // GET /api/admin/companies - Get all companies (Super Admin only) or single company by ID
 export async function GET(request: NextRequest) {
@@ -102,16 +106,23 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const result = await db.updateCompany(companyId, updateData)
+    // Update company in Supabase
+    const { data: company, error } = await supabase
+      .from('companies')
+      .update(updateData)
+      .eq('id', companyId)
+      .select()
+      .single()
 
-    if (!result.success) {
+    if (error) {
+      console.error('Error updating company:', error)
       return NextResponse.json(
-        { error: result.error },
-        { status: 400 }
+        { error: 'Failed to update company' },
+        { status: 500 }
       )
     }
 
-    return NextResponse.json(result.data)
+    return NextResponse.json(company)
   } catch (error) {
     console.error('Update company error:', error)
     return NextResponse.json(

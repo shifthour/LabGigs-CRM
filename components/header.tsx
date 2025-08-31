@@ -28,6 +28,7 @@ export function Header() {
   const [user, setUser] = useState<any>({})
   const [realNotifications, setRealNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(false)
+  const [companyLogo, setCompanyLogo] = useState<string>("")
 
   // Load user data from localStorage
   const loadUserData = () => {
@@ -43,10 +44,29 @@ export function Header() {
           return
         }
         setUser(parsed)
+        // Load company logo from Supabase
+        loadCompanyLogo(parsed.company_id)
       } catch {
         localStorage.removeItem('user')
         setUser({})
       }
+    }
+  }
+
+  // Load company logo from Supabase
+  const loadCompanyLogo = async (companyId: string) => {
+    if (!companyId) return
+    
+    try {
+      const response = await fetch(`/api/admin/companies?companyId=${companyId}`)
+      if (response.ok) {
+        const company = await response.json()
+        if (company.logo_url) {
+          setCompanyLogo(company.logo_url)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading company logo:', error)
     }
   }
 
@@ -219,7 +239,7 @@ export function Header() {
     return 'User'
   }
 
-  const companyLogo = user.company?.logo_url || "/company-logo.png"
+  const finalCompanyLogo = companyLogo || user.company?.logo_url || "/company-logo.png"
   const companyName = user.company?.name || "LabGig"
 
   return (
@@ -230,7 +250,7 @@ export function Header() {
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center overflow-hidden">
               <img
-                src={companyLogo || "/placeholder.svg"}
+                src={finalCompanyLogo || "/placeholder.svg"}
                 alt={`${companyName} Logo`}
                 className="w-full h-full object-contain"
                 onError={(e) => {

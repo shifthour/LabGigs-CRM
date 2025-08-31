@@ -56,9 +56,9 @@ const roleBasedNavigation = {
       icon: Activity,
       type: "category",
       children: [
-        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: "12" },
-        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: "NEW" },
-        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: "8" },
+        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: null },
+        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: null },
+        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: null },
       ]
     },
     {
@@ -66,10 +66,10 @@ const roleBasedNavigation = {
       icon: ShoppingBag,
       type: "category", 
       children: [
-        { name: "Leads", href: "/leads", icon: UserCheck, badge: "298" },
-        { name: "Contacts", href: "/contacts", icon: Contact, badge: "1.2K" },
-        { name: "Accounts", href: "/accounts", icon: Building2, badge: "3.9K" },
-        { name: "Deals", href: "/deals", icon: Handshake, badge: "15" },
+        { name: "Leads", href: "/leads", icon: UserCheck, badge: null },
+        { name: "Contacts", href: "/contacts", icon: Contact, badge: null },
+        { name: "Accounts", href: "/accounts", icon: Building2, badge: null },
+        { name: "Deals", href: "/deals", icon: Handshake, badge: null },
       ]
     },
     {
@@ -77,10 +77,10 @@ const roleBasedNavigation = {
       icon: Package,
       type: "category",
       children: [
-        { name: "Products", href: "/products", icon: Package, badge: "2K+" },
-        { name: "Quotations", href: "/quotations", icon: FileText, badge: "12" },
-        { name: "Sales Orders", href: "/sales-orders", icon: ShoppingCart, badge: "23" },
-        { name: "Invoices", href: "/invoices", icon: FileText, badge: "45" },
+        { name: "Products", href: "/products", icon: Package, badge: null },
+        { name: "Quotations", href: "/quotations", icon: FileText, badge: null },
+        { name: "Sales Orders", href: "/sales-orders", icon: ShoppingCart, badge: null },
+        { name: "Invoices", href: "/invoices", icon: FileText, badge: null },
       ]
     },
     {
@@ -88,9 +88,9 @@ const roleBasedNavigation = {
       icon: Wrench,
       type: "category",
       children: [
-        { name: "Installations", href: "/installations", icon: Wrench, badge: "8" },
-        { name: "AMC", href: "/amc", icon: Calendar, badge: "89" },
-        { name: "Complaints", href: "/complaints", icon: AlertTriangle, badge: "23" },
+        { name: "Installations", href: "/installations", icon: Wrench, badge: null },
+        { name: "AMC", href: "/amc", icon: Calendar, badge: null },
+        { name: "Complaints", href: "/complaints", icon: AlertTriangle, badge: null },
       ]
     },
     {
@@ -98,8 +98,8 @@ const roleBasedNavigation = {
       icon: Briefcase, 
       type: "category",
       children: [
-        { name: "Projects", href: "/projects", icon: Briefcase, badge: "12" },
-        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: "156" },
+        { name: "Projects", href: "/projects", icon: Briefcase, badge: null },
+        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
       ]
     },
     {
@@ -107,8 +107,8 @@ const roleBasedNavigation = {
       icon: LifeBuoy,
       type: "category",
       children: [
-        { name: "Cases", href: "/cases", icon: Ticket, badge: "23" },
-        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: "89" },
+        { name: "Cases", href: "/cases", icon: Ticket, badge: null },
+        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
       ]
     },
     {
@@ -117,7 +117,7 @@ const roleBasedNavigation = {
       type: "category",
       children: [
         { name: "MIS Reports", href: "/mis-reports", icon: BarChart3, badge: null },
-        { name: "Doc Library", href: "/doc-library", icon: FolderOpen, badge: "270" },
+        { name: "Doc Library", href: "/doc-library", icon: FolderOpen, badge: null },
         { name: "Admin", href: "/admin", icon: Settings, badge: null },
       ]
     },
@@ -129,9 +129,9 @@ const roleBasedNavigation = {
       icon: Activity,
       type: "category",
       children: [
-        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: "10" },
-        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: "NEW" },
-        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: "6" },
+        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: null },
+        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: null },
+        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: null },
       ]
     },
     {
@@ -139,9 +139,9 @@ const roleBasedNavigation = {
       icon: Wrench,
       type: "category",
       children: [
-        { name: "Installations", href: "/installations", icon: Wrench, badge: "8" },
-        { name: "AMC", href: "/amc", icon: Calendar, badge: "89" },
-        { name: "Complaints", href: "/complaints", icon: AlertTriangle, badge: "23" },
+        { name: "Installations", href: "/installations", icon: Wrench, badge: null },
+        { name: "AMC", href: "/amc", icon: Calendar, badge: null },
+        { name: "Complaints", href: "/complaints", icon: AlertTriangle, badge: null },
       ]
     },
     {
@@ -149,8 +149,8 @@ const roleBasedNavigation = {
       icon: Briefcase,
       type: "category",
       children: [
-        { name: "Projects", href: "/projects", icon: Briefcase, badge: "12" },
-        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: "45" },
+        { name: "Projects", href: "/projects", icon: Briefcase, badge: null },
+        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
       ]
     },
     {
@@ -158,8 +158,8 @@ const roleBasedNavigation = {
       icon: LifeBuoy,
       type: "category",
       children: [
-        { name: "Cases", href: "/cases", icon: Ticket, badge: "15" },
-        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: "45" },
+        { name: "Cases", href: "/cases", icon: Ticket, badge: null },
+        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
       ]
     },
     {
@@ -167,7 +167,7 @@ const roleBasedNavigation = {
       icon: BarChart3,
       type: "category",
       children: [
-        { name: "Doc Library", href: "/doc-library", icon: FolderOpen, badge: "270" },
+        { name: "Doc Library", href: "/doc-library", icon: FolderOpen, badge: null },
       ]
     },
   ],
@@ -178,9 +178,9 @@ const roleBasedNavigation = {
       icon: Activity,
       type: "category",
       children: [
-        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: "14" },
-        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: "NEW" },
-        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: "9" },
+        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: null },
+        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: null },
+        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: null },
       ]
     },
     {
@@ -188,10 +188,10 @@ const roleBasedNavigation = {
       icon: ShoppingBag,
       type: "category",
       children: [
-        { name: "Leads", href: "/leads", icon: UserCheck, badge: "298" },
-        { name: "Contacts", href: "/contacts", icon: Contact, badge: "1.2K" },
-        { name: "Accounts", href: "/accounts", icon: Building2, badge: "3.9K" },
-        { name: "Deals", href: "/deals", icon: Handshake, badge: "15" },
+        { name: "Leads", href: "/leads", icon: UserCheck, badge: null },
+        { name: "Contacts", href: "/contacts", icon: Contact, badge: null },
+        { name: "Accounts", href: "/accounts", icon: Building2, badge: null },
+        { name: "Deals", href: "/deals", icon: Handshake, badge: null },
       ]
     },
     {
@@ -199,10 +199,10 @@ const roleBasedNavigation = {
       icon: Package,
       type: "category",
       children: [
-        { name: "Products", href: "/products", icon: Package, badge: "2K+" },
-        { name: "Quotations", href: "/quotations", icon: FileText, badge: "12" },
-        { name: "Sales Orders", href: "/sales-orders", icon: ShoppingCart, badge: "23" },
-        { name: "Invoices", href: "/invoices", icon: Receipt, badge: "45" },
+        { name: "Products", href: "/products", icon: Package, badge: null },
+        { name: "Quotations", href: "/quotations", icon: FileText, badge: null },
+        { name: "Sales Orders", href: "/sales-orders", icon: ShoppingCart, badge: null },
+        { name: "Invoices", href: "/invoices", icon: Receipt, badge: null },
       ]
     },
     {
@@ -210,9 +210,9 @@ const roleBasedNavigation = {
       icon: Wrench,
       type: "category",
       children: [
-        { name: "Installations", href: "/installations", icon: Wrench, badge: "8" },
-        { name: "AMC", href: "/amc", icon: Calendar, badge: "89" },
-        { name: "Complaints", href: "/complaints", icon: AlertTriangle, badge: "23" },
+        { name: "Installations", href: "/installations", icon: Wrench, badge: null },
+        { name: "AMC", href: "/amc", icon: Calendar, badge: null },
+        { name: "Complaints", href: "/complaints", icon: AlertTriangle, badge: null },
       ]
     },
     {
@@ -220,8 +220,8 @@ const roleBasedNavigation = {
       icon: Briefcase,
       type: "category",
       children: [
-        { name: "Projects", href: "/projects", icon: Briefcase, badge: "12" },
-        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: "156" },
+        { name: "Projects", href: "/projects", icon: Briefcase, badge: null },
+        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
       ]
     },
     {
@@ -229,8 +229,8 @@ const roleBasedNavigation = {
       icon: LifeBuoy,
       type: "category",
       children: [
-        { name: "Cases", href: "/cases", icon: Ticket, badge: "12" },
-        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: "25" },
+        { name: "Cases", href: "/cases", icon: Ticket, badge: null },
+        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
       ]
     },
     {
@@ -239,7 +239,7 @@ const roleBasedNavigation = {
       type: "category",
       children: [
         { name: "MIS Reports", href: "/mis-reports", icon: BarChart3, badge: null },
-        { name: "Doc Library", href: "/doc-library", icon: FolderOpen, badge: "270" },
+        { name: "Doc Library", href: "/doc-library", icon: FolderOpen, badge: null },
       ]
     },
   ],
@@ -250,9 +250,9 @@ const roleBasedNavigation = {
       icon: Activity,
       type: "category",
       children: [
-        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: "18" },
-        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: "NEW" },
-        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: "7" },
+        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: null },
+        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: null },
+        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: null },
       ]
     },
     {
@@ -260,9 +260,9 @@ const roleBasedNavigation = {
       icon: Briefcase,
       type: "category",
       children: [
-        { name: "Projects", href: "/projects", icon: Briefcase, badge: "12" },
-        { name: "Installations", href: "/installations", icon: Wrench, badge: "8" },
-        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: "156" },
+        { name: "Projects", href: "/projects", icon: Briefcase, badge: null },
+        { name: "Installations", href: "/installations", icon: Wrench, badge: null },
+        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
       ]
     },
     {
@@ -270,8 +270,8 @@ const roleBasedNavigation = {
       icon: LifeBuoy,
       type: "category",
       children: [
-        { name: "Cases", href: "/cases", icon: Ticket, badge: "18" },
-        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: "67" },
+        { name: "Cases", href: "/cases", icon: Ticket, badge: null },
+        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
       ]
     },
     {
@@ -279,10 +279,10 @@ const roleBasedNavigation = {
       icon: BarChart3,
       type: "category",
       children: [
-        { name: "Doc Library", href: "/doc-library", icon: FolderOpen, badge: "270" },
+        { name: "Doc Library", href: "/doc-library", icon: FolderOpen, badge: null },
       ]
     },
-    { name: "Accounts", href: "/accounts", icon: Building2, badge: "1.2K", type: "item" },
+    { name: "Accounts", href: "/accounts", icon: Building2, badge: null, type: "item" },
   ],
   "Sales Rep": [
     { name: "Dashboard", href: "/", icon: Home, badge: null, type: "item" },
@@ -291,9 +291,9 @@ const roleBasedNavigation = {
       icon: Activity,
       type: "category",
       children: [
-        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: "9" },
-        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: "NEW" },
-        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: "5" },
+        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: null },
+        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: null },
+        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: null },
       ]
     },
     {
@@ -301,10 +301,10 @@ const roleBasedNavigation = {
       icon: ShoppingBag,
       type: "category",
       children: [
-        { name: "Leads", href: "/leads", icon: UserCheck, badge: "45" },
-        { name: "Contacts", href: "/contacts", icon: Contact, badge: "234" },
-        { name: "Accounts", href: "/accounts", icon: Building2, badge: "234" },
-        { name: "Deals", href: "/deals", icon: Handshake, badge: "8" },
+        { name: "Leads", href: "/leads", icon: UserCheck, badge: null },
+        { name: "Contacts", href: "/contacts", icon: Contact, badge: null },
+        { name: "Accounts", href: "/accounts", icon: Building2, badge: null },
+        { name: "Deals", href: "/deals", icon: Handshake, badge: null },
       ]
     },
     {
@@ -312,8 +312,8 @@ const roleBasedNavigation = {
       icon: LifeBuoy,
       type: "category",
       children: [
-        { name: "Cases", href: "/cases", icon: Ticket, badge: "8" },
-        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: "12" },
+        { name: "Cases", href: "/cases", icon: Ticket, badge: null },
+        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
       ]
     },
     {
@@ -321,7 +321,7 @@ const roleBasedNavigation = {
       icon: BarChart3,
       type: "category",
       children: [
-        { name: "Doc Library", href: "/doc-library", icon: FolderOpen, badge: "270" },
+        { name: "Doc Library", href: "/doc-library", icon: FolderOpen, badge: null },
       ]
     },
   ],
@@ -332,9 +332,9 @@ const roleBasedNavigation = {
       icon: Activity,
       type: "category",
       children: [
-        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: "15" },
-        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: "NEW" },
-        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: "10" },
+        { name: "Daily Hub", href: "/activities/daily-hub", icon: Calendar, badge: null },
+        { name: "AI Assistant", href: "/activities/ai-assistant", icon: Brain, badge: null },
+        { name: "Follow-ups", href: "/activities/follow-ups", icon: Bell, badge: null },
       ]
     },
     {
@@ -342,10 +342,10 @@ const roleBasedNavigation = {
       icon: ShoppingBag,
       type: "category",
       children: [
-        { name: "Leads", href: "/leads", icon: UserCheck, badge: "298" },
-        { name: "Contacts", href: "/contacts", icon: Contact, badge: "1.2K" },
-        { name: "Accounts", href: "/accounts", icon: Building2, badge: "3.9K" },
-        { name: "Deals", href: "/deals", icon: Handshake, badge: "15" },
+        { name: "Leads", href: "/leads", icon: UserCheck, badge: null },
+        { name: "Contacts", href: "/contacts", icon: Contact, badge: null },
+        { name: "Accounts", href: "/accounts", icon: Building2, badge: null },
+        { name: "Deals", href: "/deals", icon: Handshake, badge: null },
       ]
     },
     {
@@ -353,10 +353,10 @@ const roleBasedNavigation = {
       icon: Package,
       type: "category",
       children: [
-        { name: "Products", href: "/products", icon: Package, badge: "2K+" },
-        { name: "Quotations", href: "/quotations", icon: FileText, badge: "12" },
-        { name: "Sales Orders", href: "/sales-orders", icon: ShoppingCart, badge: "23" },
-        { name: "Invoices", href: "/invoices", icon: FileText, badge: "45" },
+        { name: "Products", href: "/products", icon: Package, badge: null },
+        { name: "Quotations", href: "/quotations", icon: FileText, badge: null },
+        { name: "Sales Orders", href: "/sales-orders", icon: ShoppingCart, badge: null },
+        { name: "Invoices", href: "/invoices", icon: FileText, badge: null },
       ]
     },
     {
@@ -364,9 +364,9 @@ const roleBasedNavigation = {
       icon: Wrench,
       type: "category",
       children: [
-        { name: "Installations", href: "/installations", icon: Wrench, badge: "8" },
-        { name: "AMC", href: "/amc", icon: Calendar, badge: "89" },
-        { name: "Complaints", href: "/complaints", icon: AlertTriangle, badge: "23" },
+        { name: "Installations", href: "/installations", icon: Wrench, badge: null },
+        { name: "AMC", href: "/amc", icon: Calendar, badge: null },
+        { name: "Complaints", href: "/complaints", icon: AlertTriangle, badge: null },
       ]
     },
     {
@@ -374,8 +374,8 @@ const roleBasedNavigation = {
       icon: Briefcase,
       type: "category",
       children: [
-        { name: "Projects", href: "/projects", icon: Briefcase, badge: "12" },
-        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: "156" },
+        { name: "Projects", href: "/projects", icon: Briefcase, badge: null },
+        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
       ]
     },
     {
@@ -383,8 +383,8 @@ const roleBasedNavigation = {
       icon: LifeBuoy,
       type: "category",
       children: [
-        { name: "Cases", href: "/cases", icon: Ticket, badge: "23" },
-        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: "89" },
+        { name: "Cases", href: "/cases", icon: Ticket, badge: null },
+        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
       ]
     },
     {
@@ -393,7 +393,7 @@ const roleBasedNavigation = {
       type: "category",
       children: [
         { name: "MIS Reports", href: "/mis-reports", icon: BarChart3, badge: null },
-        { name: "Doc Library", href: "/doc-library", icon: FolderOpen, badge: "270" },
+        { name: "Doc Library", href: "/doc-library", icon: FolderOpen, badge: null },
         { name: "Admin", href: "/admin", icon: Settings, badge: null },
       ]
     },
@@ -474,40 +474,16 @@ export function RoleBasedSidebar() {
   }
   
   const getBadge = (routePath: string) => {
-    if (!statsLoaded) return "..." // Show loading state
-    
-    switch (routePath) {
-      case "/leads": return navigationStats?.leads ? formatCount(navigationStats.leads) : "0"
-      case "/contacts": return navigationStats?.contacts ? formatCount(navigationStats.contacts) : "0"
-      case "/accounts": return navigationStats?.accounts ? formatCount(navigationStats.accounts) : "0"
-      case "/deals": return navigationStats?.deals ? formatCount(navigationStats.deals) : "0"
-      case "/products": return navigationStats?.products ? formatCount(navigationStats.products) : "0"
-      case "/quotations": return navigationStats?.quotations ? formatCount(navigationStats.quotations) : "0"
-      case "/sales-orders": return navigationStats?.salesOrders ? formatCount(navigationStats.salesOrders) : "0"
-      case "/installations": return navigationStats?.installations ? formatCount(navigationStats.installations) : "0"
-      case "/amc": return navigationStats?.amc ? formatCount(navigationStats.amc) : "0"
-      case "/complaints": return navigationStats?.complaints ? formatCount(navigationStats.complaints) : "0"
-      default: return null
-    }
+    // Badges removed from navigation
+    return null
   }
   
   // Use current user's role, fallback to Sales Manager
   const currentRole = currentUser?.role?.name?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || "Sales Manager"
   let navigation = roleBasedNavigation[currentRole] || roleBasedNavigation["Sales Manager"] || []
   
-  // Update navigation with real counts using getBadge function
-  navigation = navigation.map(item => {
-    if (item.type === "category" && item.children) {
-      return {
-        ...item,
-        children: item.children.map(child => ({
-          ...child,
-          badge: getBadge(child.href) || child.badge
-        }))
-      }
-    }
-    return item
-  })
+  // Badges removed - keep original navigation structure
+  // navigation = navigation (no mapping needed)
   
   // Update admin links based on user type
   if (currentUser?.is_admin || currentUser?.is_super_admin) {
