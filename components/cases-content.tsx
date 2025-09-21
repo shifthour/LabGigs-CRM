@@ -1,408 +1,411 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Ticket, AlertCircle, CheckCircle2, Clock, User, Calendar, Search, Filter, Plus, Eye, Edit, MoreHorizontal, MessageSquare, Phone, Mail, TrendingUp, AlertTriangle } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { EnhancedCard } from "@/components/ui/enhanced-card"
+import { 
+  Plus, Search, Download, Eye, Edit, AlertCircle, Clock, CheckCircle,
+  Building, User, Package, Phone, Mail, Settings, Brain, TrendingUp, AlertTriangle
+} from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import storageService from "@/lib/localStorage-service"
+
+const caseCategories = ["All", "Technical Support", "Delivery Issue", "Software Issue", "Hardware Issue", "Training", "Warranty", "Installation"]
+const issueSeverities = ["All", "Low", "Medium", "High", "Critical"]
+const caseStatuses = ["All", "Open", "In Progress", "Under Investigation", "Pending Customer", "Resolved", "Closed", "Escalated"]
 
 export function CasesContent() {
+  const { toast } = useToast()
+  const [casesList, setCasesList] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedTab, setSelectedTab] = useState("all")
+  const [selectedCategory, setSelectedCategory] = useState("All")
+  const [selectedSeverity, setSelectedSeverity] = useState("All")
+  const [selectedStatus, setSelectedStatus] = useState("All")
+  const [selectedAssignedTo, setSelectedAssignedTo] = useState("All")
+  const [casesStatsState, setCasesStatsState] = useState({
+    total: 0,
+    open: 0,
+    resolved: 0,
+    avgResolutionTime: 0,
+    highPriority: 0
+  })
 
-  const casesStats = [
+  // Load cases from API on component mount
+  useEffect(() => {
+    loadCases()
+  }, [])
+
+  const loadCases = async () => {
+    try {
+      const response = await fetch('/api/cases')
+      if (response.ok) {
+        const data = await response.json()
+        const cases = data.cases || []
+        console.log("loadCases - cases from API:", cases)
+        setCasesList(cases)
+        
+        // Calculate stats
+        const open = cases.filter(c => c.status === 'Open' || c.status === 'In Progress' || c.status === 'Under Investigation').length
+        const resolved = cases.filter(c => c.status === 'Resolved' || c.status === 'Closed').length
+        const highPriority = cases.filter(c => c.priority === 'High' || c.priority === 'Critical').length
+        
+        setCasesStatsState({
+          total: cases.length,
+          open: open,
+          resolved: resolved,
+          avgResolutionTime: 2.4, // Mock average
+          highPriority: highPriority
+        })
+      } else {
+        console.error('Failed to fetch cases')
+        // Fallback to localStorage
+        const storedCases = storageService.getAll<any>('cases')
+        setCasesList(storedCases)
+      }
+    } catch (error) {
+      console.error('Error loading cases:', error)
+      // Fallback to localStorage
+      const storedCases = storageService.getAll<any>('cases')
+      setCasesList(storedCases)
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "open":
+        return "bg-red-100 text-red-800"
+      case "in progress":
+        return "bg-yellow-100 text-yellow-800"
+      case "under investigation":
+        return "bg-blue-100 text-blue-800"
+      case "pending customer":
+        return "bg-purple-100 text-purple-800"
+      case "resolved":
+        return "bg-green-100 text-green-800"
+      case "closed":
+        return "bg-gray-100 text-gray-800"
+      case "escalated":
+        return "bg-orange-100 text-orange-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getSeverityColor = (severity: string) => {
+    switch (severity?.toLowerCase()) {
+      case "low":
+        return "bg-green-100 text-green-800"
+      case "medium":
+        return "bg-yellow-100 text-yellow-800"
+      case "high":
+        return "bg-orange-100 text-orange-800"
+      case "critical":
+        return "bg-red-100 text-red-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A'
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    })
+  }
+
+  // Filter cases based on search and filters
+  const filteredCases = casesList.filter(caseItem => {
+    const matchesSearch = searchTerm === "" || 
+      caseItem.case_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      caseItem.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      caseItem.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      caseItem.contact_person?.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesCategory = selectedCategory === "All" || caseItem.case_category === selectedCategory
+    const matchesSeverity = selectedSeverity === "All" || caseItem.severity === selectedSeverity
+    const matchesStatus = selectedStatus === "All" || caseItem.status === selectedStatus
+    const matchesAssigned = selectedAssignedTo === "All" || caseItem.assigned_to === selectedAssignedTo
+
+    return matchesSearch && matchesCategory && matchesSeverity && matchesStatus && matchesAssigned
+  })
+
+  // Get unique assigned users for filter
+  const uniqueAssignedUsers = Array.from(
+    new Set(casesList.map(caseItem => caseItem.assigned_to).filter(Boolean))
+  )
+
+  // Enhanced stats for the cards
+  const stats = [
     {
       title: "Total Cases",
-      value: "247",
-      change: "+8.2%",
-      icon: Ticket,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
+      value: casesStatsState.total.toString(),
+      change: "All reported cases",
+      icon: AlertTriangle,
+      iconColor: "text-blue-600",
+      iconBg: "bg-blue-100"
     },
     {
       title: "Open Cases",
-      value: "89",
-      change: "+12.5%", 
+      value: casesStatsState.open.toString(),
+      change: "Need attention",
       icon: AlertCircle,
-      color: "text-red-600",
-      bgColor: "bg-red-50",
+      iconColor: "text-red-600",
+      iconBg: "bg-red-100"
     },
     {
-      title: "Resolved",
-      value: "142",
-      change: "+15.3%",
-      icon: CheckCircle2,
-      color: "text-green-600",
-      bgColor: "bg-green-50",
+      title: "Resolved Cases",
+      value: casesStatsState.resolved.toString(),
+      change: "Successfully resolved",
+      icon: CheckCircle,
+      iconColor: "text-green-600",
+      iconBg: "bg-green-100"
     },
     {
-      title: "Avg Resolution",
-      value: "2.4 days",
-      change: "-18.5%",
-      icon: Clock,
-      color: "text-purple-600",
-      bgColor: "bg-purple-50",
-    },
-  ]
-
-  const cases = [
-    {
-      id: "CASE-2024-001",
-      title: "Fibrinometer calibration issue",
-      customer: "Kerala Agricultural University",
-      contact: "Dr. Priya Sharma",
-      priority: "high",
-      status: "open",
-      category: "Technical Support",
-      createdDate: "2024-08-18",
-      lastUpdate: "2 hours ago",
-      assignedTo: "Rajesh Kumar",
-      description: "Equipment showing inconsistent readings after recent software update",
-      customerSatisfaction: null
-    },
-    {
-      id: "CASE-2024-002", 
-      title: "Missing accessories in shipment",
-      customer: "Eurofins Advinus",
-      contact: "Mr. Mahesh Patel",
-      priority: "medium",
-      status: "in-progress",
-      category: "Delivery Issue",
-      createdDate: "2024-08-17",
-      lastUpdate: "1 day ago",
-      assignedTo: "Anjali Menon",
-      description: "Centrifuge accessories not included in latest order delivery",
-      customerSatisfaction: null
-    },
-    {
-      id: "CASE-2024-003",
-      title: "Training request for new staff",
-      customer: "TSAR Labcare",
-      contact: "Ms. Pauline D'Souza",
-      priority: "low",
-      status: "resolved",
-      category: "Training",
-      createdDate: "2024-08-15",
-      lastUpdate: "3 days ago",
-      assignedTo: "Sanjay Verma",
-      description: "On-site training needed for 5 new lab technicians",
-      customerSatisfaction: 5
-    },
-    {
-      id: "CASE-2024-004",
-      title: "Software license activation problem",
-      customer: "JNCASR",
-      contact: "Dr. Anu Rang",
-      priority: "high",
-      status: "escalated",
-      category: "Software Issue",
-      createdDate: "2024-08-16",
-      lastUpdate: "6 hours ago",
-      assignedTo: "Technical Team",
-      description: "Unable to activate premium features after license upgrade",
-      customerSatisfaction: null
-    },
-    {
-      id: "CASE-2024-005",
-      title: "Warranty claim for defective part",
-      customer: "Bio-Rad Laboratories",
-      contact: "Mr. Sanjay Patel",
-      priority: "medium",
-      status: "pending",
-      category: "Warranty",
-      createdDate: "2024-08-19",
-      lastUpdate: "4 hours ago",
-      assignedTo: "Warranty Team",
-      description: "Microscope objective lens showing manufacturing defect",
-      customerSatisfaction: null
-    },
-    {
-      id: "CASE-2024-006",
-      title: "Installation scheduling request",
-      customer: "Thermo Fisher Scientific",
-      contact: "Ms. Anjali Menon",
-      priority: "medium",
-      status: "resolved",
-      category: "Installation",
-      createdDate: "2024-08-14",
-      lastUpdate: "5 days ago",
-      assignedTo: "Installation Team",
-      description: "Schedule installation for new spectrometer equipment",
-      customerSatisfaction: 4
+      title: "High Priority",
+      value: casesStatsState.highPriority.toString(),
+      change: "Critical & High priority",
+      icon: TrendingUp,
+      iconColor: "text-orange-600",
+      iconBg: "bg-orange-100"
     }
   ]
-
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      open: "bg-red-100 text-red-800",
-      "in-progress": "bg-yellow-100 text-yellow-800",
-      resolved: "bg-green-100 text-green-800",
-      escalated: "bg-purple-100 text-purple-800",
-      pending: "bg-gray-100 text-gray-800",
-      closed: "bg-blue-100 text-blue-800"
-    }
-    return variants[status as keyof typeof variants] || "bg-gray-100 text-gray-800"
-  }
-
-  const getPriorityBadge = (priority: string) => {
-    const variants = {
-      high: "bg-red-100 text-red-800",
-      medium: "bg-yellow-100 text-yellow-800", 
-      low: "bg-green-100 text-green-800"
-    }
-    return variants[priority as keyof typeof variants] || "bg-gray-100 text-gray-800"
-  }
-
-  const filteredCases = cases.filter(caseItem => {
-    const matchesSearch = caseItem.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         caseItem.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         caseItem.id.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    if (selectedTab === "all") return matchesSearch
-    if (selectedTab === "open") return matchesSearch && caseItem.status === "open"
-    if (selectedTab === "high-priority") return matchesSearch && caseItem.priority === "high"
-    if (selectedTab === "resolved") return matchesSearch && caseItem.status === "resolved"
-    
-    return matchesSearch
-  })
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Customer Cases</h1>
-          <p className="text-gray-500 mt-1">Track and manage customer support cases and feedback</p>
+          <h1 className="text-2xl font-bold text-gray-900">Cases Management</h1>
+          <p className="text-gray-600">Track and manage customer support cases and issues</p>
         </div>
-        <div className="flex items-center space-x-3">
-          <Button variant="outline" size="sm">
-            <Filter className="w-4 h-4 mr-2" />
-            Filter
+        <div className="flex space-x-2">
+          <Button variant="outline">
+            <Download className="w-4 h-4 mr-2" />
+            Export
           </Button>
-          <Button className="bg-blue-600 hover:bg-blue-700" size="sm">
+          <Button>
             <Plus className="w-4 h-4 mr-2" />
-            Create Case
+            Log Case
           </Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {casesStats.map((stat, index) => (
-          <Card key={index}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">{stat.title}</p>
-                  <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                  <p className={`text-xs mt-1 ${stat.title === "Avg Resolution" ? "text-green-600" : "text-blue-600"}`}>
-                    {stat.change} vs last month
-                  </p>
-                </div>
-                <div className={`w-12 h-12 ${stat.bgColor} rounded-lg flex items-center justify-center`}>
-                  <stat.icon className={`w-6 h-6 ${stat.color}`} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Enhanced Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {stats.map((stat) => (
+          <EnhancedCard 
+            key={stat.title} 
+            title={stat.title} 
+            value={stat.value} 
+            change={stat.change} 
+            icon={stat.icon}
+            iconColor={stat.iconColor}
+            iconBg={stat.iconBg}
+          />
         ))}
       </div>
 
-      {/* Search and Tabs */}
-      <div className="space-y-4">
-        <div className="flex items-center space-x-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="Search cases by ID, title, or customer..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+      <Card>
+        <CardHeader>
+          <CardTitle>Case Search & Filters</CardTitle>
+          <CardDescription>Filter and search through support cases</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Search cases by number, title, customer, or contact..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10"
+              />
+            </div>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                {caseCategories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedSeverity} onValueChange={setSelectedSeverity}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="All Severity" />
+              </SelectTrigger>
+              <SelectContent>
+                {issueSeverities.map((severity) => (
+                  <SelectItem key={severity} value={severity}>
+                    {severity}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                {caseStatuses.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {status}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedAssignedTo} onValueChange={setSelectedAssignedTo}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="All Assigned" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Assigned</SelectItem>
+                {uniqueAssignedUsers.map(user => (
+                  <SelectItem key={user} value={user}>{user}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        <Tabs defaultValue="all" className="w-full" onValueChange={setSelectedTab}>
-          <TabsList className="grid w-full grid-cols-4 max-w-md">
-            <TabsTrigger value="all">All Cases</TabsTrigger>
-            <TabsTrigger value="open">Open</TabsTrigger>
-            <TabsTrigger value="high-priority">High Priority</TabsTrigger>
-            <TabsTrigger value="resolved">Resolved</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="all" className="space-y-4">
-            <CasesTable cases={filteredCases} />
-          </TabsContent>
-          <TabsContent value="open" className="space-y-4">
-            <CasesTable cases={filteredCases} />
-          </TabsContent>
-          <TabsContent value="high-priority" className="space-y-4">
-            <CasesTable cases={filteredCases} />
-          </TabsContent>
-          <TabsContent value="resolved" className="space-y-4">
-            <CasesTable cases={filteredCases} />
-          </TabsContent>
-        </Tabs>
-      </div>
+      {/* Cases List - Card View */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Cases List</CardTitle>
+          <CardDescription>Showing {filteredCases.length} of {casesList.length} cases</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {filteredCases.length === 0 ? (
+              <div className="text-center py-12">
+                <AlertTriangle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">No cases found</p>
+                <p className="text-sm text-gray-400 mt-2">
+                  {searchTerm || selectedCategory !== "All" || selectedSeverity !== "All" || selectedStatus !== "All" || selectedAssignedTo !== "All"
+                    ? "Try adjusting your filters" 
+                    : "Click 'Log Case' to create your first case"}
+                </p>
+              </div>
+            ) : (
+              filteredCases.map((caseItem) => (
+                <div
+                  key={caseItem.id}
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center space-x-6">
+                    <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                      <AlertTriangle className="w-6 h-6 text-red-600" />
+                    </div>
+                    
+                    {/* Case Details */}
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <h3 className="font-semibold text-gray-900">
+                          {caseItem.case_number}
+                        </h3>
+                        <Badge className={getStatusColor(caseItem.status)}>
+                          {caseItem.status}
+                        </Badge>
+                        <Badge className={getSeverityColor(caseItem.severity)}>
+                          {caseItem.severity}
+                        </Badge>
+                        <Badge variant="outline" className="text-blue-600 border-blue-200">
+                          {caseItem.case_category}
+                        </Badge>
+                      </div>
+                      <p className="text-sm font-medium text-gray-900 mt-1">{caseItem.title}</p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Date: {formatDate(caseItem.case_date)}
+                      </p>
+                    </div>
+                    
+                    {/* Customer & Contact Details */}
+                    <div className="border-l pl-6">
+                      <div className="flex items-center gap-1 text-sm">
+                        <Building className="w-4 h-4 text-gray-400" />
+                        <span className="font-medium">{caseItem.customer_name}</span>
+                      </div>
+                      {caseItem.contact_person && (
+                        <div className="flex items-center gap-1 text-sm text-gray-600 mt-1">
+                          <User className="w-4 h-4 text-gray-400" />
+                          <span>{caseItem.contact_person}</span>
+                        </div>
+                      )}
+                      {caseItem.contact_phone && (
+                        <div className="flex items-center gap-1 text-sm text-gray-600 mt-1">
+                          <Phone className="w-3 h-3 text-gray-400" />
+                          <span>{caseItem.contact_phone}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Product & Assignment Details */}
+                    <div className="border-l pl-6">
+                      {caseItem.product_name && (
+                        <div className="flex items-center gap-1 text-sm">
+                          <Package className="w-4 h-4 text-gray-400" />
+                          <span className="max-w-xs truncate" title={caseItem.product_name}>
+                            {caseItem.product_name}
+                          </span>
+                        </div>
+                      )}
+                      {caseItem.assigned_to && (
+                        <div className="flex items-center gap-1 text-sm text-gray-600 mt-1">
+                          <Settings className="w-4 h-4 text-gray-400" />
+                          <span>Assigned: {caseItem.assigned_to}</span>
+                        </div>
+                      )}
+                      {caseItem.issue_type && (
+                        <div className="flex items-center gap-1 text-sm text-gray-600 mt-1">
+                          <span className="max-w-xs truncate" title={caseItem.issue_type}>
+                            Type: {caseItem.issue_type}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Action Buttons */}
+                  <div className="flex items-center space-x-1">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      title="View Case Details"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      title="Edit Case"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      title="AI Analysis"
+                      className="text-purple-600 hover:text-purple-800 hover:bg-purple-50"
+                    >
+                      <Brain className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
 
-function CasesTable({ cases }: { cases: any[] }) {
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      open: "bg-red-100 text-red-800",
-      "in-progress": "bg-yellow-100 text-yellow-800",
-      resolved: "bg-green-100 text-green-800",
-      escalated: "bg-purple-100 text-purple-800",
-      pending: "bg-gray-100 text-gray-800",
-      closed: "bg-blue-100 text-blue-800"
-    }
-    return variants[status as keyof typeof variants] || "bg-gray-100 text-gray-800"
-  }
-
-  const getPriorityBadge = (priority: string) => {
-    const variants = {
-      high: "bg-red-100 text-red-800",
-      medium: "bg-yellow-100 text-yellow-800", 
-      low: "bg-green-100 text-green-800"
-    }
-    return variants[priority as keyof typeof variants] || "bg-gray-100 text-gray-800"
-  }
-
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, index) => (
-      <span key={index} className={index < rating ? "text-yellow-400" : "text-gray-300"}>
-        ★
-      </span>
-    ))
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Cases Overview</CardTitle>
-        <CardDescription>Complete list of customer support cases</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Case ID</TableHead>
-                <TableHead>Title & Customer</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Assigned To</TableHead>
-                <TableHead>Last Update</TableHead>
-                <TableHead>Satisfaction</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {cases.map((caseItem) => (
-                <TableRow key={caseItem.id}>
-                  <TableCell>
-                    <div className="font-mono text-sm">{caseItem.id}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium text-gray-900">{caseItem.title}</p>
-                      <p className="text-sm text-gray-500">{caseItem.customer}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <User className="w-3 h-3 mr-1" />
-                      {caseItem.contact}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getPriorityBadge(caseItem.priority)}>
-                      {caseItem.priority}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusBadge(caseItem.status)}>
-                      {caseItem.status.replace("-", " ")}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-gray-600">{caseItem.category}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-gray-600">{caseItem.assignedTo}</span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Clock className="w-3 h-3 mr-1" />
-                      {caseItem.lastUpdate}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {caseItem.customerSatisfaction ? (
-                      <div className="flex items-center space-x-1">
-                        {renderStars(caseItem.customerSatisfaction)}
-                        <span className="text-sm text-gray-600 ml-1">
-                          ({caseItem.customerSatisfaction}/5)
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-gray-400">Pending</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem>
-                          <Eye className="mr-2 h-4 w-4" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit Case
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <MessageSquare className="mr-2 h-4 w-4" />
-                          Add Comment
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>
-                          <Phone className="mr-2 h-4 w-4" />
-                          Call Customer
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Mail className="mr-2 h-4 w-4" />
-                          Send Email
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}

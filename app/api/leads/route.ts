@@ -29,13 +29,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { companyId, ...leadData } = body
+    const { companyId, selected_products, ...leadData } = body
 
     if (!companyId) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
 
-    // Prepare lead data for insertion
+    // Prepare lead data for insertion (excluding product-specific fields that will be in junction table)
     const leadToInsert = {
       ...leadData,
       company_id: companyId,
@@ -43,10 +43,14 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString()
     }
 
-    // Remove any undefined or null fields that shouldn't be stored
+    // Remove selected_products from the main lead data and any undefined/null fields
     Object.keys(leadToInsert).forEach(key => {
-      if (leadToInsert[key] === undefined || leadToInsert[key] === '') {
-        leadToInsert[key] = null
+      if (leadToInsert[key] === undefined || leadToInsert[key] === '' || key === 'selected_products') {
+        if (key === 'selected_products') {
+          delete leadToInsert[key]
+        } else {
+          leadToInsert[key] = null
+        }
       }
     })
 
@@ -59,6 +63,27 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Error creating lead:', error)
       return NextResponse.json({ error: 'Failed to create lead' }, { status: 500 })
+    }
+
+    // Insert selected products into lead_products table
+    if (selected_products && selected_products.length > 0) {
+      const leadProducts = selected_products.map((product: any) => ({
+        lead_id: newLead.id,
+        product_id: product.product_id,
+        product_name: product.product_name,
+        quantity: product.quantity,
+        price_per_unit: product.price_per_unit,
+        notes: product.notes || null
+      }))
+
+      const { error: productsError } = await supabase
+        .from('lead_products')
+        .insert(leadProducts)
+
+      if (productsError) {
+        console.error('Error inserting lead products:', productsError)
+        // Don't fail the entire operation, just log the error
+      }
     }
 
     // Auto-create activity if next_followup_date is set
@@ -97,22 +122,26 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, companyId, ...leadData } = body
+    const { id, companyId, selected_products, ...leadData } = body
 
     if (!id || !companyId) {
       return NextResponse.json({ error: 'Lead ID and Company ID are required' }, { status: 400 })
     }
 
-    // Prepare lead data for update
+    // Prepare lead data for update (excluding product-specific fields)
     const leadToUpdate = {
       ...leadData,
       updated_at: new Date().toISOString()
     }
 
-    // Remove any undefined fields
+    // Remove selected_products and any undefined fields
     Object.keys(leadToUpdate).forEach(key => {
-      if (leadToUpdate[key] === undefined || leadToUpdate[key] === '') {
-        leadToUpdate[key] = null
+      if (leadToUpdate[key] === undefined || leadToUpdate[key] === '' || key === 'selected_products') {
+        if (key === 'selected_products') {
+          delete leadToUpdate[key]
+        } else {
+          leadToUpdate[key] = null
+        }
       }
     })
 
@@ -131,6 +160,34 @@ export async function PUT(request: NextRequest) {
 
     if (!updatedLead) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    }
+
+    // Update selected products in lead_products table
+    if (selected_products && selected_products.length > 0) {
+      // First, delete existing products for this lead
+      await supabase
+        .from('lead_products')
+        .delete()
+        .eq('lead_id', id)
+
+      // Then insert the new products
+      const leadProducts = selected_products.map((product: any) => ({
+        lead_id: id,
+        product_id: product.product_id,
+        product_name: product.product_name,
+        quantity: product.quantity,
+        price_per_unit: product.price_per_unit,
+        notes: product.notes || null
+      }))
+
+      const { error: productsError } = await supabase
+        .from('lead_products')
+        .insert(leadProducts)
+
+      if (productsError) {
+        console.error('Error updating lead products:', productsError)
+        // Don't fail the entire operation, just log the error
+      }
     }
 
     // Auto-create activity if next_followup_date is set and this is a new follow-up date

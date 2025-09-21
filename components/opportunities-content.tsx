@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -26,16 +27,103 @@ import {
   Phone,
   Mail,
   Users,
+  FileText,
 } from "lucide-react"
 import { AIPredictiveAnalytics } from "@/components/ai-predictive-analytics"
 import { AIInsightsPanel } from "@/components/ai-insights-panel"
 import { AIEmailGenerator } from "@/components/ai-email-generator"
 import { AIProductRecommendations } from "@/components/ai-product-recommendations"
 import { DataImportModal } from "@/components/data-import-modal"
+import { MultipleProductSelector } from "@/components/multiple-product-selector"
+import { AddQuotationModal } from "@/components/add-quotation-modal"
 import { AIInsightsService, type OpportunityData, type AIInsight } from "@/lib/ai-services"
 import { AIDealIntelligenceCard } from "@/components/ai-deals-intelligence-card"
 import { useToast } from "@/hooks/use-toast"
 import storageService from "@/lib/localStorage-service"
+import { createClient } from '@supabase/supabase-js'
+
+// Smart Product Display Component for Deals
+const ProductsDisplay = ({ dealProducts, totalValue }: { dealProducts: any[], totalValue: number }) => {
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount)
+  }
+
+  if (!dealProducts || dealProducts.length === 0) {
+    return <span className="text-gray-400 text-sm">No products</span>
+  }
+
+  if (dealProducts.length === 1) {
+    // Single product - show name clearly
+    const product = dealProducts[0]
+    return (
+      <div>
+        <p className="text-sm font-medium">{product.product_name}</p>
+        <div className="text-xs text-gray-500 space-y-1 mt-1">
+          <p>Qty: {product.quantity}</p>
+          <p>Total: {formatCurrency(product.total_amount || 0)}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Multiple products - show smart summary
+  const firstProduct = dealProducts[0]
+  const remainingCount = dealProducts.length - 1
+  
+  return (
+    <div>
+      <div className="flex items-center space-x-2">
+        <p className="text-sm font-medium">{firstProduct.product_name}</p>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Badge 
+              variant="outline" 
+              className="text-xs cursor-pointer hover:bg-blue-50 hover:border-blue-300"
+            >
+              +{remainingCount} more
+            </Badge>
+          </PopoverTrigger>
+          <PopoverContent className="w-80" align="start">
+            <div className="space-y-3">
+              <h4 className="font-semibold text-sm">All Products ({dealProducts.length})</h4>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {dealProducts.map((product, index) => (
+                  <div key={index} className="flex justify-between items-center text-sm border-b pb-2">
+                    <div>
+                      <div className="font-medium">{product.product_name}</div>
+                      <div className="text-xs text-gray-500">Qty: {product.quantity}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium">{formatCurrency(product.total_amount || 0)}</div>
+                      <div className="text-xs text-gray-500">
+                        @ {formatCurrency(product.price_per_unit || 0)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t pt-2">
+                <div className="flex justify-between font-semibold">
+                  <span>Total Value:</span>
+                  <span className="text-blue-600">{formatCurrency(totalValue)}</span>
+                </div>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+      <div className="text-xs text-gray-500 space-y-1 mt-1">
+        <p>Products: {dealProducts.length}</p>
+        <p>Total: {formatCurrency(totalValue)}</p>
+      </div>
+    </div>
+  )
+}
 
 interface Deal {
   id: string
@@ -47,6 +135,10 @@ interface Deal {
   contact_person: string
   phone?: string
   email?: string
+  // Multiple products support
+  dealProducts?: any[]
+  totalProducts?: number
+  calculatedValue?: number
   whatsapp?: string
   product: string
   quantity?: number
@@ -93,11 +185,20 @@ export function OpportunitiesContent() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isQuotationModalOpen, setIsQuotationModalOpen] = useState(false)
+  const [dealForQuotation, setDealForQuotation] = useState<Deal | null>(null)
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
+  const [emailDeal, setEmailDeal] = useState<Deal | null>(null)
+  
+  // Add Deal form states
+  const [selectedProducts, setSelectedProducts] = useState<any[]>([])
+  const [totalBudget, setTotalBudget] = useState(0)
 
   // Load deals from database on component mount
   useEffect(() => {
     loadDeals()
   }, [])
+
 
   const loadDeals = async () => {
     try {
@@ -110,29 +211,77 @@ export function OpportunitiesContent() {
       if (dealsResponse.ok) {
         const data = await dealsResponse.json()
         const dealsArray = data.deals || []
-        console.log("loadDeals - API deals:", dealsArray)
-        setDeals(dealsArray)
+        
+        // For each deal, fetch its products from deal_products table
+        const dealsWithProducts = await Promise.all(
+          dealsArray.map(async (deal: any) => {
+            try {
+              // Try to fetch deal products
+              const productsResponse = await fetch(`/api/deals/${deal.id}/products`)
+              let dealProducts = []
+              
+              if (productsResponse.ok) {
+                dealProducts = await productsResponse.json()
+              }
+              
+              // If no products in junction table, use legacy single product
+              if (dealProducts.length === 0 && deal.product) {
+                dealProducts = [{
+                  product_name: deal.product,
+                  quantity: deal.quantity || 1,
+                  price_per_unit: deal.price_per_unit || (deal.value || 0),
+                  total_amount: deal.value || 0
+                }]
+              }
+              
+              return { 
+                ...deal, 
+                dealProducts,
+                totalProducts: dealProducts.length,
+                calculatedValue: dealProducts.reduce((sum: number, p: any) => sum + (p.total_amount || 0), 0) || deal.value || 0
+              }
+            } catch (error) {
+              console.error(`Error fetching products for deal ${deal.id}:`, error)
+              // Fallback to legacy single product
+              const fallbackProducts = deal.product ? [{
+                product_name: deal.product,
+                quantity: deal.quantity || 1,
+                price_per_unit: deal.price_per_unit || (deal.value || 0),
+                total_amount: deal.value || 0
+              }] : []
+              return { 
+                ...deal, 
+                dealProducts: fallbackProducts,
+                totalProducts: fallbackProducts.length,
+                calculatedValue: deal.value || 0
+              }
+            }
+          })
+        )
+        
+        console.log("loadDeals - API deals with products:", dealsWithProducts)
+        setDeals(dealsWithProducts)
         
         if (accountsResponse.ok) {
           const accountsData = await accountsResponse.json()
           setAccounts(accountsData.accounts || [])
         }
         
-        // Calculate stats
-        const thisMonth = dealsArray.filter((deal: Deal) => 
+        // Calculate stats using calculated values from multiple products
+        const thisMonth = dealsWithProducts.filter((deal: Deal) => 
           new Date(deal.expected_close_date).getMonth() === new Date().getMonth()
         ).length
         
-        const totalValue = dealsArray.reduce((sum: number, deal: Deal) => 
-          sum + (deal.value || 0), 0
+        const totalValue = dealsWithProducts.reduce((sum: number, deal: Deal) => 
+          sum + (deal.calculatedValue || deal.value || 0), 0
         )
         
-        const weightedValue = dealsArray.reduce((sum: number, deal: Deal) =>
-          sum + ((deal.value || 0) * (deal.probability / 100)), 0
+        const weightedValue = dealsWithProducts.reduce((sum: number, deal: Deal) =>
+          sum + ((deal.calculatedValue || deal.value || 0) * (deal.probability / 100)), 0
         )
         
         setDealsStats({
-          total: dealsArray.length,
+          total: dealsWithProducts.length,
           thisMonth: thisMonth,
           totalValue: totalValue,
           weightedValue: weightedValue
@@ -279,6 +428,9 @@ export function OpportunitiesContent() {
         description: `Deal ${newDeal.deal.account_name} has been successfully created.`
       })
       setIsAddDialogOpen(false)
+      // Clear form
+      setSelectedProducts([])
+      setTotalBudget(0)
     } catch (error) {
       console.error('Error creating deal:', error)
       toast({
@@ -326,6 +478,48 @@ export function OpportunitiesContent() {
     
     setIsEditDialogOpen(false)
     setSelectedDeal(null)
+  }
+
+  const handleCreateQuotation = (deal: Deal) => {
+    console.log("Creating quotation from deal:", deal)
+    setDealForQuotation(deal)
+    setIsQuotationModalOpen(true)
+  }
+
+  const handleSaveQuotation = async (quotationData: any) => {
+    try {
+      const response = await fetch('/api/quotations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(quotationData)
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        const newQuotation = data.quotation
+        
+        toast({
+          title: "Quotation created",
+          description: `Quotation ${newQuotation.quote_number} has been successfully created from deal: ${dealForQuotation?.deal_name}`
+        })
+        setIsQuotationModalOpen(false)
+        setDealForQuotation(null)
+        
+        // Navigate to quotations page
+        window.location.href = '/quotations'
+      } else {
+        throw new Error('Failed to create quotation')
+      }
+    } catch (error) {
+      console.error("Failed to create quotation:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create quotation from deal. Please try again.",
+        variant: "destructive"
+      })
+    }
   }
 
   return (
@@ -527,24 +721,22 @@ export function OpportunitiesContent() {
                         {/* Product Details */}
                         <div className="ml-10">
                           <div className="flex items-start gap-x-10">
-                            <p className="text-sm font-medium">{deal.product}</p>
+                            {/* Smart Products Display */}
+                            <ProductsDisplay 
+                              dealProducts={deal.dealProducts} 
+                              totalValue={deal.calculatedValue || deal.value} 
+                            />
                             <div className="text-xs text-gray-500">
                               <p>Stage: {deal.stage}</p>
                               <p>Assigned to: {deal.assigned_to}</p>
                             </div>
                           </div>
-                          <div className="text-xs text-gray-500 space-y-1 mt-1">
-                            {deal.quantity && <p>Quantity: {deal.quantity}</p>}
-                            {deal.price_per_unit && <p>Price/Unit: ₹{deal.price_per_unit.toLocaleString()}</p>}
-                            {deal.budget ? <p>Budget: ₹{deal.budget.toLocaleString()}</p> : 
-                             deal.value && <p>Value: ₹{deal.value.toLocaleString()}</p>}
-                          </div>
                         </div>
                       </div>
                       
-                      <div className="flex items-center space-x-4">
+                      <div className="flex flex-col items-end space-y-2">
+                        {/* First Row - Communication Buttons */}
                         <div className="flex space-x-1">
-                          {/* Communication Buttons */}
                           {deal.phone && (
                             <Button 
                               variant="ghost" 
@@ -561,7 +753,7 @@ export function OpportunitiesContent() {
                               variant="ghost" 
                               size="sm"
                               onClick={() => {
-                                const message = encodeURIComponent(`Hi ${deal.contact_person}, I wanted to discuss about ${deal.product} deal.`)
+                                const message = encodeURIComponent(`Hi ${deal.contact_person},\n\nHope you are doing well!\n\nPlease find attached quotation for ${deal.product} for your reference.\n\nLet me know if you have any questions or need any clarifications.\n\nThanks & Regards`)
                                 window.open(`https://wa.me/${deal.whatsapp.replace(/[^0-9]/g, '')}?text=${message}`, '_blank')
                               }}
                               className="text-green-600 hover:text-green-800 hover:bg-green-50"
@@ -574,11 +766,30 @@ export function OpportunitiesContent() {
                             <Button 
                               variant="ghost" 
                               size="sm"
-                              onClick={() => window.open(`mailto:${deal.email}`, '_blank')}
+                              onClick={() => {
+                                setEmailDeal(deal)
+                                setIsEmailModalOpen(true)
+                              }}
                               className="text-orange-600 hover:text-orange-800 hover:bg-orange-50"
                               title="Send Email"
                             >
                               <Mail className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+
+                        {/* Second Row - Action Buttons */}
+                        <div className="flex space-x-1">
+                          {/* Create Quotation Button */}
+                          {deal.status === "Active" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCreateQuotation(deal)}
+                              title="Create Quotation"
+                              className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                            >
+                              <FileText className="w-4 h-4" />
                             </Button>
                           )}
                           
@@ -619,13 +830,12 @@ export function OpportunitiesContent() {
               <Label htmlFor="contactPerson">Contact Person</Label>
               <Input id="contactPerson" placeholder="Enter contact person" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="product">Product</Label>
-              <Input id="product" placeholder="Enter product" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="value">Value</Label>
-              <Input id="value" placeholder="Enter value" />
+            <div className="col-span-2 space-y-2">
+              <MultipleProductSelector 
+                selectedProducts={selectedProducts}
+                onProductsChange={setSelectedProducts}
+                onTotalBudgetChange={setTotalBudget}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="stage">Stage</Label>
@@ -668,17 +878,52 @@ export function OpportunitiesContent() {
             </div>
           </div>
           <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+            <Button variant="outline" onClick={() => {
+              setIsAddDialogOpen(false)
+              setSelectedProducts([])
+              setTotalBudget(0)
+            }}>
               Cancel
             </Button>
             <Button onClick={() => {
-              // Collect form data and create deal
+              // Validate required fields
+              const accountName = (document.getElementById('accountName') as HTMLInputElement)?.value || ''
+              const contactPerson = (document.getElementById('contactPerson') as HTMLInputElement)?.value || ''
+              
+              if (!accountName) {
+                toast({
+                  title: "Validation Error",
+                  description: "Please enter account name",
+                  variant: "destructive"
+                })
+                return
+              }
+              
+              if (selectedProducts.length === 0) {
+                toast({
+                  title: "Validation Error", 
+                  description: "Please select at least one product",
+                  variant: "destructive"
+                })
+                return
+              }
+              
+              // Collect form data and create deal with multiple products
               const formData = {
-                deal_name: `${(document.getElementById('accountName') as HTMLInputElement)?.value || ''} - ${(document.getElementById('product') as HTMLInputElement)?.value || ''}`,
-                account_name: (document.getElementById('accountName') as HTMLInputElement)?.value || '',
-                contact_person: (document.getElementById('contactPerson') as HTMLInputElement)?.value || '',
-                product: (document.getElementById('product') as HTMLInputElement)?.value || '',
-                value: parseFloat((document.getElementById('value') as HTMLInputElement)?.value || '0'),
+                deal_name: `${accountName} - ${selectedProducts[0]?.productName || 'Deal'}`,
+                account_name: accountName,
+                contact_person: contactPerson,
+                // Include selected products for the new API
+                selected_products: selectedProducts.map(product => ({
+                  product_id: product.id,
+                  product_name: product.productName,
+                  quantity: product.quantity,
+                  price_per_unit: product.price,
+                  total_amount: product.totalAmount
+                })),
+                // For backward compatibility, include primary product info
+                product: selectedProducts[0]?.productName || '',
+                value: totalBudget,
                 stage: 'Qualification',
                 probability: parseInt((document.getElementById('probability') as HTMLInputElement)?.value || '25'),
                 expected_close_date: (document.getElementById('closeDate') as HTMLInputElement)?.value || '',
@@ -801,6 +1046,156 @@ export function OpportunitiesContent() {
         moduleType="deals"
         onImport={handleImportData}
       />
+
+      {/* Add Quotation Modal */}
+      {dealForQuotation && (
+        <AddQuotationModal
+          isOpen={isQuotationModalOpen}
+          onClose={() => {
+            setIsQuotationModalOpen(false)
+            setDealForQuotation(null)
+          }}
+          onSave={handleSaveQuotation}
+          isCreateMode={true}  // This is a new quotation, not editing
+          editingQuotation={{
+            // Pre-populate with deal data
+            customer_name: dealForQuotation.account_name,
+            contact_person: dealForQuotation.contact_person,
+            customer_email: dealForQuotation.email,
+            customer_phone: dealForQuotation.phone,
+            billing_address: `${dealForQuotation.city || ''}, ${dealForQuotation.state || ''}`.trim().replace(/^,|,$/, ''),
+            subject: `Quotation for ${dealForQuotation.deal_name}`,
+            notes: `Generated from deal: ${dealForQuotation.deal_name}`,
+            priority: dealForQuotation.priority || 'Medium',
+            // Properly structure items from deal products
+            items: dealForQuotation.dealProducts && dealForQuotation.dealProducts.length > 0 ? 
+              dealForQuotation.dealProducts.map((product: any, index: number) => ({
+                id: (index + 1).toString(),
+                product: product.product_name || "Product/Service",
+                description: `Product from deal: ${dealForQuotation.deal_name}`,
+                quantity: product.quantity || 1,
+                unitPrice: product.price_per_unit || (product.total_amount / (product.quantity || 1)) || 0,
+                discount: 0,
+                taxRate: 18,
+                amount: product.total_amount || ((product.quantity || 1) * (product.price_per_unit || 0))
+              })) : [{
+                id: "1",
+                product: dealForQuotation.product || "Product/Service",
+                description: `Product from deal: ${dealForQuotation.deal_name}`,
+                quantity: dealForQuotation.quantity || 1,
+                unitPrice: dealForQuotation.price_per_unit || dealForQuotation.value || 0,
+                discount: 0,
+                taxRate: 18,
+                amount: dealForQuotation.value || 0
+              }]
+          }}
+        />
+      )}
+
+      {/* Email Compose Modal */}
+      <Dialog open={isEmailModalOpen} onOpenChange={setIsEmailModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Compose Email</DialogTitle>
+            <DialogDescription>
+              Email draft ready. Click "Open Email Client" to send through your default email application.
+            </DialogDescription>
+          </DialogHeader>
+          {emailDeal && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">From:</Label>
+                <div className="p-2 bg-gray-50 rounded-md">
+                  {(() => {
+                    const storedUser = localStorage.getItem('user')
+                    try {
+                      const user = storedUser ? JSON.parse(storedUser) : null
+                      return user?.email || 'Your email address'
+                    } catch {
+                      return 'Your email address'
+                    }
+                  })()}
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">To:</Label>
+                <div className="p-2 bg-gray-50 rounded-md">{emailDeal.email}</div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Subject:</Label>
+                <Input 
+                  id="email-subject" 
+                  defaultValue={`Regarding ${emailDeal.deal_name} - ${emailDeal.product}`}
+                  className="font-medium"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Message:</Label>
+                <Textarea 
+                  id="email-body"
+                  defaultValue={`Dear ${emailDeal.contact_person},
+
+I hope this email finds you well. I wanted to follow up regarding our discussion about ${emailDeal.product} for ${emailDeal.account_name}.
+
+Please let me know if you have any questions or if you'd like to schedule a meeting to discuss this further.
+
+Best regards,
+${(() => {
+  const storedUser = localStorage.getItem('user')
+  try {
+    const user = storedUser ? JSON.parse(storedUser) : null
+    return user?.full_name || user?.name || 'Your Name'
+  } catch {
+    return 'Your Name'
+  }
+})()}`}
+                  rows={10}
+                  className="font-mono text-sm"
+                />
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> This will open your default email client with the pre-filled content. 
+                  Make sure you have an email client configured on your system.
+                </p>
+              </div>
+            </div>
+          )}
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => {
+              setIsEmailModalOpen(false)
+              setEmailDeal(null)
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (emailDeal) {
+                  const subject = encodeURIComponent((document.getElementById('email-subject') as HTMLInputElement)?.value || '')
+                  const body = encodeURIComponent((document.getElementById('email-body') as HTMLTextAreaElement)?.value || '')
+                  window.open(`mailto:${emailDeal.email}?subject=${subject}&body=${body}`, '_blank')
+                  
+                  toast({
+                    title: "Email client opened",
+                    description: "Your default email client should now be open with the pre-filled content."
+                  })
+                  
+                  setIsEmailModalOpen(false)
+                  setEmailDeal(null)
+                }
+              }}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Mail className="w-4 h-4 mr-2" />
+              Open Email Client
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

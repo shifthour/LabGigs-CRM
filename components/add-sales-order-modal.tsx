@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,6 +16,8 @@ import { ShoppingCart, Plus, Minus, User, FileText, Truck, Settings, Save, X, Ca
 interface AddSalesOrderModalProps {
   isOpen: boolean
   onClose: () => void
+  onSave: (salesOrderData: any) => void
+  editingData?: any
 }
 
 interface OrderItem {
@@ -27,7 +29,6 @@ interface OrderItem {
   discount: number
   taxRate: number
   amount: number
-  deliveryDate: string
 }
 
 interface FormData {
@@ -62,7 +63,7 @@ interface FormData {
   serviceContract: boolean
 }
 
-export function AddSalesOrderModal({ isOpen, onClose }: AddSalesOrderModalProps) {
+export function AddSalesOrderModal({ isOpen, onClose, onSave, editingData }: AddSalesOrderModalProps) {
   const [formData, setFormData] = useState<FormData>({
     accountName: "",
     contactPerson: "",
@@ -97,12 +98,106 @@ export function AddSalesOrderModal({ isOpen, onClose }: AddSalesOrderModalProps)
       unitPrice: 0,
       discount: 0,
       taxRate: 18,
-      amount: 0,
-      deliveryDate: ""
+      amount: 0
     }
   ])
 
   const [activeTab, setActiveTab] = useState("customer")
+
+  // Populate form when editingData is provided (for quotation/deal conversion)
+  useEffect(() => {
+    if (editingData && isOpen) {
+      console.log("Populating sales order form with data:", editingData)
+      console.log("Account name from editingData:", editingData.accountName)
+      
+      // Set form data
+      setFormData({
+        accountName: editingData.accountName || "",
+        contactPerson: editingData.contactPerson || "",
+        customerEmail: editingData.customerEmail || "",
+        customerPhone: editingData.customerPhone || "",
+        billingAddress: editingData.billingAddress || "",
+        shippingAddress: editingData.shippingAddress || editingData.billingAddress || "",
+        orderDate: editingData.orderDate || new Date().toISOString().split('T')[0],
+        quotationRef: editingData.quotationRef || "",
+        customerPO: "",
+        expectedDelivery: editingData.expectedDelivery || "",
+        shippingMethod: editingData.shippingMethod || "Standard Delivery",
+        notes: editingData.notes || "",
+        assignedTo: editingData.assignedTo || "",
+        priority: editingData.priority || "Medium",
+        currency: editingData.currency || "INR",
+        paymentStatus: "Pending",
+        paymentTerms: editingData.paymentTerms || "50% Advance, 50% on Delivery",
+        advanceAmount: "",
+        installationRequired: false,
+        trainingRequired: false,
+        warrantyPeriod: "12 months",
+        serviceContract: false
+      })
+      
+      // Set items data
+      if (editingData.items && editingData.items.length > 0) {
+        console.log("Setting items from editingData:", editingData.items)
+        // Ensure all items have proper amount calculations
+        const processedItems = editingData.items.map((item: any) => {
+          const subtotal = (item.quantity || 1) * (item.unitPrice || 0)
+          const discountAmount = subtotal * ((item.discount || 0) / 100)
+          const taxableAmount = subtotal - discountAmount
+          const taxAmount = taxableAmount * ((item.taxRate || 18) / 100)
+          const amount = taxableAmount + taxAmount
+          
+          return {
+            ...item,
+            quantity: item.quantity || 1,
+            unitPrice: item.unitPrice || 0,
+            discount: item.discount || 0,
+            taxRate: item.taxRate || 18,
+            amount: amount
+          }
+        })
+        console.log("Processed items with calculated amounts:", processedItems)
+        setItems(processedItems)
+      }
+    } else if (!editingData && isOpen) {
+      // Reset form when opening without editing data
+      setFormData({
+        accountName: "",
+        contactPerson: "",
+        customerEmail: "",
+        customerPhone: "",
+        billingAddress: "",
+        shippingAddress: "",
+        orderDate: new Date().toISOString().split('T')[0],
+        quotationRef: "",
+        customerPO: "",
+        expectedDelivery: "",
+        shippingMethod: "Standard Delivery",
+        notes: "",
+        assignedTo: "",
+        priority: "Medium",
+        currency: "INR",
+        paymentStatus: "Pending",
+        paymentTerms: "50% Advance, 50% on Delivery",
+        advanceAmount: "",
+        installationRequired: false,
+        trainingRequired: false,
+        warrantyPeriod: "12 months",
+        serviceContract: false
+      })
+      
+      setItems([{
+        id: "1",
+        product: "",
+        description: "",
+        quantity: 1,
+        unitPrice: 0,
+        discount: 0,
+        taxRate: 18,
+        amount: 0
+      }])
+    }
+  }, [editingData, isOpen])
 
   const handleInputChange = (field: keyof FormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -117,8 +212,7 @@ export function AddSalesOrderModal({ isOpen, onClose }: AddSalesOrderModalProps)
       unitPrice: 0,
       discount: 0,
       taxRate: 18,
-      amount: 0,
-      deliveryDate: ""
+      amount: 0
     }
     setItems(prev => [...prev, newItem])
   }
@@ -148,8 +242,10 @@ export function AddSalesOrderModal({ isOpen, onClose }: AddSalesOrderModalProps)
   }
 
   const calculateTotals = () => {
+    console.log("Calculating totals for items:", items)
     const subtotal = items.reduce((sum, item) => {
       const itemSubtotal = item.quantity * item.unitPrice
+      console.log(`Item ${item.product}: qty=${item.quantity}, unitPrice=${item.unitPrice}, subtotal=${itemSubtotal}`)
       return sum + itemSubtotal
     }, 0)
     
@@ -168,20 +264,57 @@ export function AddSalesOrderModal({ isOpen, onClose }: AddSalesOrderModalProps)
     
     const grandTotal = taxableAmount + totalTax
     
-    return { subtotal, totalDiscount, taxableAmount, totalTax, grandTotal }
+    const result = { subtotal, totalDiscount, taxableAmount, totalTax, grandTotal }
+    console.log("Calculated totals:", result)
+    return result
   }
 
   const handleSubmit = () => {
     const totals = calculateTotals()
+    
+    // Map to database schema
     const salesOrderData = {
-      ...formData,
-      items,
-      totals,
-      orderId: `SO-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`
+      // Core fields matching database schema
+      order_id: `SO-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
+      order_date: formData.orderDate || new Date().toISOString().split('T')[0],
+      customer_name: formData.accountName,
+      contact_person: formData.contactPerson,
+      customer_email: formData.customerEmail,
+      customer_phone: formData.customerPhone,
+      billing_address: formData.billingAddress,
+      shipping_address: formData.shippingAddress,
+      
+      // Products and amounts
+      total_amount: totals.grandTotal,
+      subtotal: totals.subtotal,
+      tax_amount: totals.totalTax,
+      discount_amount: totals.totalDiscount,
+      
+      // Order details
+      status: "confirmed",
+      payment_status: formData.paymentStatus?.toLowerCase() || "pending",
+      expected_delivery: formData.expectedDelivery || null,
+      assigned_to: formData.assignedTo,
+      priority: formData.priority || "Medium",
+      currency: formData.currency || "INR",
+      
+      // Additional info
+      quotation_ref: formData.quotationRef || null,
+      customer_po: formData.customerPO || null,
+      notes: formData.notes || null,
+      payment_terms: formData.paymentTerms || null,
+      advance_amount: parseFloat(formData.advanceAmount) || 0,
+      warranty_period: formData.warrantyPeriod || null,
+      installation_required: formData.installationRequired || false,
+      training_required: formData.trainingRequired || false,
+      service_contract: formData.serviceContract || false,
+      
+      // Company ID for filtering
+      company_id: 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
     }
     
-    console.log("Sales Order Data:", salesOrderData)
-    onClose()
+    console.log("Sales Order Data (mapped to database):", salesOrderData)
+    onSave(salesOrderData)
   }
 
   // Options
@@ -190,7 +323,6 @@ export function AddSalesOrderModal({ isOpen, onClose }: AddSalesOrderModalProps)
   const assignees = ["Hari Kumar K", "Prashanth Sandilya", "Vijay Muppala", "Pauline"]
   const priorities = ["Low", "Medium", "High", "Urgent"]
   const paymentStatuses = ["Pending", "Advance Received", "Partially Paid", "Paid", "Overdue"]
-  const shippingMethods = ["Standard Delivery", "Express Delivery", "Customer Pickup", "Installation Service"]
   const warrantyPeriods = ["6 months", "12 months", "18 months", "24 months", "36 months"]
 
   const totals = calculateTotals()
@@ -239,16 +371,28 @@ export function AddSalesOrderModal({ isOpen, onClose }: AddSalesOrderModalProps)
                     <Label htmlFor="accountName" className="text-sm font-medium">
                       Account Name <span className="text-red-500">*</span>
                     </Label>
-                    <Select value={formData.accountName} onValueChange={(value) => handleInputChange("accountName", value)}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select account" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {accounts.map((account) => (
-                          <SelectItem key={account} value={account}>{account}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {editingData ? (
+                      // Use Input field when pre-populating from deal/quotation conversion
+                      <Input
+                        id="accountName"
+                        value={formData.accountName}
+                        onChange={(e) => handleInputChange("accountName", e.target.value)}
+                        placeholder="Enter account name"
+                        className="mt-1"
+                      />
+                    ) : (
+                      // Use Select dropdown for new sales orders
+                      <Select value={formData.accountName} onValueChange={(value) => handleInputChange("accountName", value)}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts.map((account) => (
+                            <SelectItem key={account} value={account}>{account}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   <div>
@@ -358,7 +502,7 @@ export function AddSalesOrderModal({ isOpen, onClose }: AddSalesOrderModalProps)
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="expectedDelivery" className="text-sm font-medium">
                       Expected Delivery <span className="text-red-500">*</span>
@@ -370,20 +514,6 @@ export function AddSalesOrderModal({ isOpen, onClose }: AddSalesOrderModalProps)
                       onChange={(e) => handleInputChange("expectedDelivery", e.target.value)}
                       className="mt-1"
                     />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="shippingMethod" className="text-sm font-medium">Shipping Method</Label>
-                    <Select value={formData.shippingMethod} onValueChange={(value) => handleInputChange("shippingMethod", value)}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {shippingMethods.map((method) => (
-                          <SelectItem key={method} value={method}>{method}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   </div>
 
                   <div>
@@ -429,14 +559,13 @@ export function AddSalesOrderModal({ isOpen, onClose }: AddSalesOrderModalProps)
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Product/Service</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead className="w-20">Qty</TableHead>
-                        <TableHead className="w-24">Unit Price</TableHead>
-                        <TableHead className="w-20">Discount %</TableHead>
-                        <TableHead className="w-20">Tax %</TableHead>
-                        <TableHead className="w-32">Delivery Date</TableHead>
-                        <TableHead className="w-24">Amount</TableHead>
+                        <TableHead className="w-48">Product/Service</TableHead>
+                        <TableHead className="w-36">Description</TableHead>
+                        <TableHead className="w-16">Qty</TableHead>
+                        <TableHead className="w-18">Unit Price</TableHead>
+                        <TableHead className="w-16">Disc %</TableHead>
+                        <TableHead className="w-16">Tax %</TableHead>
+                        <TableHead className="w-20">Amount</TableHead>
                         <TableHead className="w-12">Action</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -444,26 +573,37 @@ export function AddSalesOrderModal({ isOpen, onClose }: AddSalesOrderModalProps)
                       {items.map((item, index) => (
                         <TableRow key={item.id}>
                           <TableCell>
-                            <Select
-                              value={item.product}
-                              onValueChange={(value) => updateItem(item.id, "product", value)}
-                            >
-                              <SelectTrigger className="w-48">
-                                <SelectValue placeholder="Select product" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {products.map((product) => (
-                                  <SelectItem key={product} value={product}>{product}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            {editingData ? (
+                              // Use Input field when pre-populating from deal/quotation conversion
+                              <Input
+                                value={item.product}
+                                onChange={(e) => updateItem(item.id, "product", e.target.value)}
+                                placeholder="Enter product name"
+                                className="w-44"
+                              />
+                            ) : (
+                              // Use Select dropdown for new sales orders
+                              <Select
+                                value={item.product}
+                                onValueChange={(value) => updateItem(item.id, "product", value)}
+                              >
+                                <SelectTrigger className="w-44">
+                                  <SelectValue placeholder="Select product" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {products.map((product) => (
+                                    <SelectItem key={product} value={product}>{product}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
                           </TableCell>
                           <TableCell>
                             <Input
                               value={item.description}
                               onChange={(e) => updateItem(item.id, "description", e.target.value)}
                               placeholder="Product description"
-                              className="w-48"
+                              className="w-32"
                             />
                           </TableCell>
                           <TableCell>
@@ -472,7 +612,7 @@ export function AddSalesOrderModal({ isOpen, onClose }: AddSalesOrderModalProps)
                               min="1"
                               value={item.quantity}
                               onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value) || 1)}
-                              className="w-20"
+                              className="w-14"
                             />
                           </TableCell>
                           <TableCell>
@@ -481,7 +621,7 @@ export function AddSalesOrderModal({ isOpen, onClose }: AddSalesOrderModalProps)
                               step="0.01"
                               value={item.unitPrice}
                               onChange={(e) => updateItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
-                              className="w-24"
+                              className="w-16"
                             />
                           </TableCell>
                           <TableCell>
@@ -492,7 +632,7 @@ export function AddSalesOrderModal({ isOpen, onClose }: AddSalesOrderModalProps)
                               step="0.01"
                               value={item.discount}
                               onChange={(e) => updateItem(item.id, "discount", parseFloat(e.target.value) || 0)}
-                              className="w-20"
+                              className="w-14"
                             />
                           </TableCell>
                           <TableCell>
@@ -502,30 +642,25 @@ export function AddSalesOrderModal({ isOpen, onClose }: AddSalesOrderModalProps)
                               step="0.01"
                               value={item.taxRate}
                               onChange={(e) => updateItem(item.id, "taxRate", parseFloat(e.target.value) || 0)}
-                              className="w-20"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="date"
-                              value={item.deliveryDate}
-                              onChange={(e) => updateItem(item.id, "deliveryDate", e.target.value)}
-                              className="w-32"
+                              className="w-14"
                             />
                           </TableCell>
                           <TableCell className="font-medium">
                             ₹{item.amount.toLocaleString()}
                           </TableCell>
                           <TableCell>
-                            {items.length > 1 && (
+                            {items.length > 1 ? (
                               <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
                                 onClick={() => removeItem(item.id)}
-                                className="text-red-600 hover:text-red-800"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                title="Remove item"
                               >
                                 <Minus className="w-4 h-4" />
                               </Button>
+                            ) : (
+                              <span className="text-gray-400 text-xs">-</span>
                             )}
                           </TableCell>
                         </TableRow>
@@ -540,23 +675,23 @@ export function AddSalesOrderModal({ isOpen, onClose }: AddSalesOrderModalProps)
                     <div className="w-80 space-y-2">
                       <div className="flex justify-between">
                         <span>Subtotal:</span>
-                        <span>₹{totals.subtotal.toLocaleString()}</span>
+                        <span>₹{(totals.subtotal || 0).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Total Discount:</span>
-                        <span>- ₹{totals.totalDiscount.toLocaleString()}</span>
+                        <span>- ₹{(totals.totalDiscount || 0).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Taxable Amount:</span>
-                        <span>₹{totals.taxableAmount.toLocaleString()}</span>
+                        <span>₹{(totals.taxableAmount || 0).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Total Tax:</span>
-                        <span>₹{totals.totalTax.toLocaleString()}</span>
+                        <span>₹{(totals.totalTax || 0).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between text-lg font-bold border-t pt-2">
                         <span>Grand Total:</span>
-                        <span>₹{totals.grandTotal.toLocaleString()}</span>
+                        <span>₹{(totals.grandTotal || 0).toLocaleString()}</span>
                       </div>
                     </div>
                   </div>

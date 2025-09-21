@@ -1,16 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { useToast } from "@/hooks/use-toast"
 import { Save, X, Search, ChevronDown, Loader2 } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { MultipleProductSelector } from "@/components/multiple-product-selector"
 
 interface AddLeadModalProps {
   isOpen: boolean
@@ -48,6 +50,15 @@ interface Product {
   price: number
 }
 
+interface SelectedProduct {
+  id: string
+  productName: string
+  category: string
+  price: number
+  quantity: number
+  totalAmount: number
+}
+
 interface User {
   id: string
   full_name: string
@@ -80,16 +91,21 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [contacts, setContacts] = useState<Contact[]>([])
-  const [products, setProducts] = useState<Product[]>([])
   const [users, setUsers] = useState<User[]>([])
   
   // Search states for dropdowns
   const [accountSearchOpen, setAccountSearchOpen] = useState(false)
   const [contactSearchOpen, setContactSearchOpen] = useState(false)
-  const [productSearchOpen, setProductSearchOpen] = useState(false)
   const [accountSearch, setAccountSearch] = useState("")
   const [contactSearch, setContactSearch] = useState("")
-  const [productSearch, setProductSearch] = useState("")
+  
+  // Keyboard navigation states
+  const [selectedAccountIndex, setSelectedAccountIndex] = useState(-1)
+  const [selectedContactIndex, setSelectedContactIndex] = useState(-1)
+  
+  // Refs for scrolling
+  const accountListRef = useRef<HTMLDivElement>(null)
+  const contactListRef = useRef<HTMLDivElement>(null)
   
   // Form data
   const [formData, setFormData] = useState({
@@ -101,12 +117,7 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
     phone: "",
     email: "",
     leadSource: "",
-    productId: "",
-    productName: "",
     leadStatus: "New",
-    budget: "",
-    quantity: "",
-    pricePerUnit: "",
     expectedClosingDate: "",
     nextFollowupDate: "",
     city: "",
@@ -117,11 +128,14 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
     notes: ""
   })
 
+  // Separate state for selected products and budget
+  const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([])
+  const [totalBudget, setTotalBudget] = useState(0)
+
   // Load data on mount
   useEffect(() => {
     loadAccounts()
     loadContacts()
-    loadProducts()
     loadUsers()
   }, [])
 
@@ -137,12 +151,7 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
         phone: editingLead.phone || editingLead.contactNo || "",
         email: editingLead.email || "",
         leadSource: editingLead.leadSource || "",
-        productId: editingLead.productId || "",
-        productName: editingLead.productName || editingLead.product || "",
         leadStatus: editingLead.leadStatus || editingLead.salesStage || "New",
-        budget: editingLead.budget || "",
-        quantity: editingLead.quantity || "",
-        pricePerUnit: editingLead.pricePerUnit || "",
         expectedClosingDate: editingLead.expectedClosingDate || "",
         nextFollowupDate: editingLead.nextFollowupDate || "",
         city: editingLead.city || "",
@@ -152,6 +161,38 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
         assignedTo: editingLead.assignedTo || "",
         notes: editingLead.notes || ""
       })
+      
+      // For editing, populate selected products from leadProducts (multiple products support)
+      if (editingLead.leadProducts && editingLead.leadProducts.length > 0) {
+        console.log('Editing lead with multiple products:', editingLead.leadProducts)
+        const existingProducts: SelectedProduct[] = editingLead.leadProducts.map((product: any) => ({
+          id: product.product_id || `temp-${Date.now()}-${Math.random()}`,
+          productName: product.product_name,
+          category: "General", // We might not have category info
+          price: product.price_per_unit || 0,
+          quantity: product.quantity || 1,
+          totalAmount: product.total_amount || ((product.price_per_unit || 0) * (product.quantity || 1))
+        }))
+        setSelectedProducts(existingProducts)
+        setTotalBudget(existingProducts.reduce((sum, p) => sum + p.totalAmount, 0))
+      } else if (editingLead.productId && editingLead.productName) {
+        // Fallback for legacy single product format
+        console.log('Editing lead with legacy single product')
+        const existingProduct: SelectedProduct = {
+          id: editingLead.productId,
+          productName: editingLead.productName || editingLead.product,
+          category: "General",
+          price: editingLead.pricePerUnit || 0,
+          quantity: editingLead.quantity || 1,
+          totalAmount: (editingLead.pricePerUnit || 0) * (editingLead.quantity || 1)
+        }
+        setSelectedProducts([existingProduct])
+        setTotalBudget(existingProduct.totalAmount)
+      } else {
+        console.log('No products found for editing lead')
+        setSelectedProducts([])
+        setTotalBudget(0)
+      }
     } else {
       // Reset form for new lead
       setFormData({
@@ -163,12 +204,7 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
         phone: "",
         email: "",
         leadSource: "",
-        productId: "",
-        productName: "",
         leadStatus: "New",
-        budget: "",
-        quantity: "",
-        pricePerUnit: "",
         expectedClosingDate: "",
         nextFollowupDate: "",
         city: "",
@@ -178,18 +214,11 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
         assignedTo: "",
         notes: ""
       })
+      setSelectedProducts([])
+      setTotalBudget(0)
     }
   }, [editingLead, isOpen])
 
-  // Auto-calculate budget when quantity or pricePerUnit changes
-  useEffect(() => {
-    if (formData.quantity && formData.pricePerUnit) {
-      const calculatedBudget = (parseInt(formData.quantity) * parseFloat(formData.pricePerUnit)).toFixed(2)
-      setFormData(prev => ({ ...prev, budget: calculatedBudget }))
-    } else {
-      setFormData(prev => ({ ...prev, budget: "" }))
-    }
-  }, [formData.quantity, formData.pricePerUnit])
 
   const loadAccounts = async () => {
     try {
@@ -247,25 +276,6 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
     }
   }
 
-  const loadProducts = async () => {
-    try {
-      const companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
-      const response = await fetch(`/api/products?companyId=${companyId}`)
-      
-      if (response.ok) {
-        const data = await response.json()
-        const formattedProducts = data.map((product: any) => ({
-          id: product.id,
-          productName: product.product_name,
-          category: product.category || '',
-          price: product.price || 0
-        }))
-        setProducts(formattedProducts)
-      }
-    } catch (error) {
-      console.error('Error loading products:', error)
-    }
-  }
 
   const loadUsers = async () => {
     try {
@@ -332,6 +342,57 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
     }
     
     setAccountSearchOpen(false)
+    setSelectedAccountIndex(-1)
+  }
+
+  // Auto-scroll to selected item
+  const scrollToSelectedAccount = (index: number) => {
+    if (accountListRef.current) {
+      const listElement = accountListRef.current
+      const itemElements = listElement.children
+      if (itemElements[index]) {
+        const itemElement = itemElements[index] as HTMLElement
+        const containerTop = listElement.scrollTop
+        const containerBottom = containerTop + listElement.clientHeight
+        const itemTop = itemElement.offsetTop
+        const itemBottom = itemTop + itemElement.offsetHeight
+
+        if (itemTop < containerTop) {
+          listElement.scrollTop = itemTop
+        } else if (itemBottom > containerBottom) {
+          listElement.scrollTop = itemBottom - listElement.clientHeight
+        }
+      }
+    }
+  }
+
+  // Keyboard navigation handler for account dropdown with arrow keys
+  const handleAccountKeyDown = (e: React.KeyboardEvent, filteredAccounts: Account[]) => {
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        const nextIndex = selectedAccountIndex < filteredAccounts.length - 1 ? selectedAccountIndex + 1 : 0
+        setSelectedAccountIndex(nextIndex)
+        scrollToSelectedAccount(nextIndex)
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        const prevIndex = selectedAccountIndex > 0 ? selectedAccountIndex - 1 : filteredAccounts.length - 1
+        setSelectedAccountIndex(prevIndex)
+        scrollToSelectedAccount(prevIndex)
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (selectedAccountIndex >= 0 && selectedAccountIndex < filteredAccounts.length) {
+          handleAccountSelect(filteredAccounts[selectedAccountIndex])
+        }
+        break
+      case 'Escape':
+        e.preventDefault()
+        setAccountSearchOpen(false)
+        setSelectedAccountIndex(-1)
+        break
+    }
   }
 
   const handleContactSelect = (contact: Contact) => {
@@ -357,19 +418,16 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
     setContactSearchOpen(false)
   }
 
-  const handleProductSelect = (product: Product) => {
-    setFormData(prev => ({
-      ...prev,
-      productId: product.id,
-      productName: product.productName,
-      pricePerUnit: product.price.toString()
-    }))
-    setProductSearchOpen(false)
-  }
 
   const handleSubmit = async () => {
+    console.log('=== FORM SUBMISSION STARTED ===')
+    console.log('Form data:', formData)
+    console.log('Selected products:', selectedProducts)
+    console.log('Total budget:', totalBudget)
+    
     // Validate required fields
     if (!formData.accountName) {
+      console.log('Validation failed: Missing account name')
       toast({
         title: "Validation Error",
         description: "Please select an account",
@@ -379,6 +437,7 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
     }
 
     if (!formData.leadSource) {
+      console.log('Validation failed: Missing lead source')
       toast({
         title: "Validation Error",
         description: "Please select a lead source",
@@ -387,19 +446,21 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
       return
     }
 
-    if (!formData.productName) {
+    if (selectedProducts.length === 0) {
+      console.log('Validation failed: No products selected')
       toast({
         title: "Validation Error",
-        description: "Please select a product",
+        description: "Please select at least one product",
         variant: "destructive"
       })
       return
     }
 
+    console.log('Validation passed, setting isSubmitting=true')
     setIsSubmitting(true)
 
     try {
-      // Prepare lead data
+      // Prepare lead data with multiple products
       const leadData = {
         account_id: formData.accountId,
         account_name: formData.accountName,
@@ -409,20 +470,29 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
         phone: formData.phone,
         email: formData.email,
         lead_source: formData.leadSource,
-        product_id: formData.productId,
-        product_name: formData.productName,
         lead_status: formData.leadStatus,
         assigned_to: formData.assignedTo || localStorage.getItem('userName') || 'Sales Team',
-        budget: formData.budget ? parseFloat(formData.budget) : null,
-        quantity: formData.quantity ? parseInt(formData.quantity) : null,
-        price_per_unit: formData.pricePerUnit ? parseFloat(formData.pricePerUnit) : null,
+        budget: totalBudget,
         expected_closing_date: formData.expectedClosingDate || null,
         next_followup_date: formData.nextFollowupDate || null,
         city: formData.city || null,
         state: formData.state || null,
         country: formData.country || null,
         address: formData.address || null,
-        notes: formData.notes || null
+        notes: formData.notes || null,
+        // Include selected products for the new API
+        selected_products: selectedProducts.map(product => ({
+          product_id: product.id,
+          product_name: product.productName,
+          quantity: product.quantity,
+          price_per_unit: product.price,
+          total_amount: product.totalAmount
+        })),
+        // For backward compatibility, include primary product info
+        product_id: selectedProducts[0]?.id || null,
+        product_name: selectedProducts[0]?.productName || null,
+        quantity: selectedProducts.reduce((sum, p) => sum + p.quantity, 0),
+        price_per_unit: selectedProducts[0]?.price || null
       }
 
       // Call the onSave callback if provided
@@ -456,7 +526,12 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="account">Account Name *</Label>
-              <Popover open={accountSearchOpen} onOpenChange={setAccountSearchOpen}>
+              <Popover open={accountSearchOpen} onOpenChange={(open) => {
+                setAccountSearchOpen(open)
+                if (open) {
+                  setSelectedAccountIndex(-1)
+                }
+              }}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
@@ -473,20 +548,53 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
                     <Input
                       placeholder="Search accounts..."
                       value={accountSearch}
-                      onChange={(e) => setAccountSearch(e.target.value)}
-                      className="w-full"
-                    />
-                    <div className="max-h-[200px] border rounded-md custom-scrollbar">
-                      {accounts
-                        .filter(account => {
+                      onChange={(e) => {
+                        setAccountSearch(e.target.value)
+                        setSelectedAccountIndex(-1)
+                      }}
+                      onKeyDown={(e) => {
+                        const filteredAccounts = accounts.filter(account => {
                           const searchLower = accountSearch.toLowerCase()
                           const displayName = `${account.accountName} ${account.city || ''}`.toLowerCase()
                           return displayName.includes(searchLower)
                         })
-                        .map((account) => (
+                        handleAccountKeyDown(e, filteredAccounts)
+                      }}
+                      className="w-full"
+                      autoFocus
+                    />
+                    <ScrollArea 
+                      className="h-[200px] border rounded-md"
+                      onWheel={(e) => {
+                        // Allow the ScrollArea to handle wheel events properly
+                        e.stopPropagation()
+                      }}
+                      onKeyDown={(e) => {
+                        const filteredAccounts = accounts.filter(account => {
+                          const searchLower = accountSearch.toLowerCase()
+                          const displayName = `${account.accountName} ${account.city || ''}`.toLowerCase()
+                          return displayName.includes(searchLower)
+                        })
+                        handleAccountKeyDown(e, filteredAccounts)
+                      }}
+                      tabIndex={0}
+                    >
+                      <div ref={accountListRef}>
+                      {(() => {
+                        const filteredAccounts = accounts.filter(account => {
+                          const searchLower = accountSearch.toLowerCase()
+                          const displayName = `${account.accountName} ${account.city || ''}`.toLowerCase()
+                          return displayName.includes(searchLower)
+                        })
+                        return filteredAccounts.map((account, index) => (
                           <div
                             key={account.id}
-                            className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                            className={`px-3 py-2 cursor-pointer text-sm transition-colors duration-150 focus:bg-gray-100 focus:outline-none ${
+                              selectedAccountIndex === index 
+                                ? 'bg-blue-50 border-l-2 border-blue-500' 
+                                : 'hover:bg-gray-100'
+                            }`}
+                            tabIndex={-1}
                             onClick={() => {
                               handleAccountSelect(account)
                               setAccountSearch("")
@@ -495,15 +603,20 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
                           >
                             {account.accountName} {account.city && `(${account.city})`}
                           </div>
-                        ))}
-                      {accounts.filter(account => {
-                        const searchLower = accountSearch.toLowerCase()
-                        const displayName = `${account.accountName} ${account.city || ''}`.toLowerCase()
-                        return displayName.includes(searchLower)
-                      }).length === 0 && (
-                        <p className="text-sm text-gray-500 text-center py-2">No accounts found</p>
-                      )}
-                    </div>
+                        ))
+                      })()}
+                      {(() => {
+                        const filteredAccounts = accounts.filter(account => {
+                          const searchLower = accountSearch.toLowerCase()
+                          const displayName = `${account.accountName} ${account.city || ''}`.toLowerCase()
+                          return displayName.includes(searchLower)
+                        })
+                        return filteredAccounts.length === 0 && (
+                          <p className="text-sm text-gray-500 text-center py-2">No accounts found</p>
+                        )
+                      })()}
+                      </div>
+                    </ScrollArea>
                   </div>
                 </PopoverContent>
               </Popover>
@@ -551,7 +664,14 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
                       onChange={(e) => setContactSearch(e.target.value)}
                       className="w-full"
                     />
-                    <div className="max-h-[200px] border rounded-md custom-scrollbar">
+                    <ScrollArea 
+                      className="h-[200px] border rounded-md"
+                      onWheel={(e) => {
+                        // Allow the ScrollArea to handle wheel events properly
+                        e.stopPropagation()
+                      }}
+                      tabIndex={0}
+                    >
                       {contacts
                         .filter(contact => {
                           // First filter by selected account
@@ -563,14 +683,23 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
                           const displayName = `${contact.accountName} ${contact.department || ''} ${contact.contactName}`.toLowerCase()
                           return displayName.includes(searchLower)
                         })
-                        .map((contact) => (
+                        .map((contact, index) => (
                           <div
                             key={contact.id}
-                            className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                            className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm transition-colors duration-150 focus:bg-gray-100 focus:outline-none"
+                            tabIndex={0}
                             onClick={() => {
                               handleContactSelect(contact)
                               setContactSearch("")
                               setContactSearchOpen(false)
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                handleContactSelect(contact)
+                                setContactSearch("")
+                                setContactSearchOpen(false)
+                              }
                             }}
                           >
                             <div className="flex flex-col">
@@ -593,7 +722,7 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
                       }).length === 0 && (
                         <p className="text-sm text-gray-500 text-center py-2">No contacts found for this account</p>
                       )}
-                    </div>
+                    </ScrollArea>
                   </div>
                 </PopoverContent>
               </Popover>
@@ -732,113 +861,12 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
             </div>
           </div>
 
-          {/* Product */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Product Selection with Search */}
-            <div>
-              <Label htmlFor="product">Product *</Label>
-              <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={productSearchOpen}
-                    className="w-full justify-between text-left font-normal"
-                  >
-                    {formData.productName || "Select product..."}
-                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-2" align="start">
-                  <div className="space-y-2">
-                    <Input
-                      placeholder="Search products..."
-                      value={productSearch}
-                      onChange={(e) => setProductSearch(e.target.value)}
-                      className="w-full"
-                    />
-                    <div className="max-h-[200px] border rounded-md custom-scrollbar">
-                      {products
-                        .filter(product => {
-                          const searchLower = productSearch.toLowerCase()
-                          const displayName = `${product.productName} ${product.category || ''}`.toLowerCase()
-                          return displayName.includes(searchLower)
-                        })
-                        .map((product) => (
-                          <div
-                            key={product.id}
-                            className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
-                            onClick={() => {
-                              handleProductSelect(product)
-                              setProductSearch("")
-                              setProductSearchOpen(false)
-                            }}
-                          >
-                            <div className="flex flex-col">
-                              <span className="font-medium">{product.productName}</span>
-                              {product.category && (
-                                <span className="text-sm text-gray-500">{product.category}</span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      {products.filter(product => {
-                        const searchLower = productSearch.toLowerCase()
-                        const displayName = `${product.productName} ${product.category || ''}`.toLowerCase()
-                        return displayName.includes(searchLower)
-                      }).length === 0 && (
-                        <p className="text-sm text-gray-500 text-center py-2">No products found</p>
-                      )}
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div>
-              <Label htmlFor="pricePerUnit">Price Per Unit (₹)</Label>
-              <Input
-                id="pricePerUnit"
-                type="number"
-                step="0.01"
-                value={formData.pricePerUnit}
-                onChange={(e) => setFormData(prev => ({ ...prev, pricePerUnit: e.target.value }))}
-                placeholder="Auto-filled from product"
-                disabled={isSubmitting}
-              />
-            </div>
-          </div>
-
-
-          {/* Quantity and Budget */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="quantity">Quantity</Label>
-              <Input
-                id="quantity"
-                type="number"
-                min="1"
-                value={formData.quantity}
-                onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
-                placeholder="Enter quantity"
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="budget">Budget (₹)</Label>
-              <Input
-                id="budget"
-                type="number"
-                step="0.01"
-                value={formData.budget}
-                onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
-                placeholder="Auto-calculated"
-                disabled={isSubmitting}
-                readOnly
-              />
-            </div>
-          </div>
+          {/* Multiple Product Selection */}
+          <MultipleProductSelector 
+            selectedProducts={selectedProducts}
+            onProductsChange={setSelectedProducts}
+            onTotalBudgetChange={setTotalBudget}
+          />
 
           {/* Date Fields */}
           <div className="grid grid-cols-2 gap-4">
@@ -910,7 +938,12 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
             Cancel
           </Button>
           <Button 
-            onClick={handleSubmit} 
+            onClick={() => {
+              console.log('=== BUTTON CLICKED ===')
+              console.log('isSubmitting:', isSubmitting)
+              console.log('About to call handleSubmit')
+              handleSubmit()
+            }} 
             className="bg-blue-600 hover:bg-blue-700" 
             disabled={isSubmitting}
           >

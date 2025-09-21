@@ -17,6 +17,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { AddLeadModalSimplified } from "@/components/add-lead-modal-simplified"
@@ -27,6 +29,89 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.669.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.569-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893A11.821 11.821 0 0020.465 3.516"/>
   </svg>
 )
+
+// Smart Product Display Component
+const ProductsDisplay = ({ leadProducts, totalBudget }: { leadProducts: any[], totalBudget: number }) => {
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount)
+  }
+
+  if (!leadProducts || leadProducts.length === 0) {
+    return <span className="text-gray-400 text-sm">No products</span>
+  }
+
+  if (leadProducts.length === 1) {
+    // Single product - show name clearly
+    const product = leadProducts[0]
+    return (
+      <div>
+        <p className="text-sm font-medium">{product.product_name}</p>
+        <div className="text-xs text-gray-500 space-y-1 mt-1">
+          <p>Qty: {product.quantity}</p>
+          <p>Total: {formatCurrency(product.total_amount || 0)}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Multiple products - show smart summary
+  const firstProduct = leadProducts[0]
+  const remainingCount = leadProducts.length - 1
+  
+  return (
+    <div>
+      <div className="flex items-center space-x-2">
+        <p className="text-sm font-medium">{firstProduct.product_name}</p>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Badge 
+              variant="outline" 
+              className="text-xs cursor-pointer hover:bg-blue-50 hover:border-blue-300"
+            >
+              +{remainingCount} more
+            </Badge>
+          </PopoverTrigger>
+          <PopoverContent className="w-80" align="start">
+            <div className="space-y-3">
+              <h4 className="font-semibold text-sm">All Products ({leadProducts.length})</h4>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {leadProducts.map((product, index) => (
+                  <div key={index} className="flex justify-between items-center text-sm border-b pb-2">
+                    <div>
+                      <div className="font-medium">{product.product_name}</div>
+                      <div className="text-xs text-gray-500">Qty: {product.quantity}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium">{formatCurrency(product.total_amount || 0)}</div>
+                      <div className="text-xs text-gray-500">
+                        @ {formatCurrency(product.price_per_unit || 0)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t pt-2">
+                <div className="flex justify-between font-semibold">
+                  <span>Total Budget:</span>
+                  <span className="text-blue-600">{formatCurrency(totalBudget)}</span>
+                </div>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+      <div className="text-xs text-gray-500 space-y-1 mt-1">
+        <p>Products: {leadProducts.length}</p>
+        <p>Total: {formatCurrency(totalBudget)}</p>
+      </div>
+    </div>
+  )
+}
 
 
 
@@ -62,8 +147,46 @@ export function LeadsContent() {
       if (response.ok) {
         const apiLeads = await response.json()
         
+        // For each lead, fetch its products from lead_products table
+        const leadsWithProducts = await Promise.all(
+          apiLeads.map(async (lead: any) => {
+            try {
+              // Try to fetch lead products
+              const productsResponse = await fetch(`/api/leads/${lead.id}/products`)
+              let leadProducts = []
+              
+              if (productsResponse.ok) {
+                const responseData = await productsResponse.json()
+                leadProducts = responseData.products || responseData || []
+              }
+              
+              // If no products in junction table, use legacy single product
+              if (leadProducts.length === 0 && lead.product_name) {
+                leadProducts = [{
+                  product_name: lead.product_name,
+                  quantity: lead.quantity || 1,
+                  price_per_unit: lead.price_per_unit || 0,
+                  total_amount: (lead.quantity || 1) * (lead.price_per_unit || 0)
+                }]
+              }
+              
+              return { ...lead, leadProducts }
+            } catch (error) {
+              console.error(`Error fetching products for lead ${lead.id}:`, error)
+              // Fallback to legacy single product
+              const fallbackProducts = lead.product_name ? [{
+                product_name: lead.product_name,
+                quantity: lead.quantity || 1,
+                price_per_unit: lead.price_per_unit || 0,
+                total_amount: (lead.quantity || 1) * (lead.price_per_unit || 0)
+              }] : []
+              return { ...lead, leadProducts: fallbackProducts }
+            }
+          })
+        )
+        
         // Transform API data to match UI format
-        const transformedLeads = apiLeads.map((lead: any) => ({
+        const transformedLeads = leadsWithProducts.map((lead: any) => ({
           id: lead.id,
           date: new Date(lead.lead_date || lead.created_at).toLocaleDateString('en-GB'),
           leadName: lead.account_name,
@@ -77,7 +200,7 @@ export function LeadsContent() {
           email: lead.email,
           whatsapp: lead.whatsapp || lead.phone,
           assignedTo: lead.assigned_to,
-          product: lead.product_name,
+          product: lead.product_name, // Keep for backward compatibility
           productId: lead.product_id,
           leadSource: lead.lead_source,
           salesStage: lead.lead_status,
@@ -96,7 +219,11 @@ export function LeadsContent() {
           pricePerUnit: lead.price_per_unit,
           expectedClosingDate: lead.expected_closing_date,
           nextFollowupDate: lead.next_followup_date,
-          notes: lead.notes
+          notes: lead.notes,
+          // Add multiple products support
+          leadProducts: lead.leadProducts || [],
+          totalProducts: lead.leadProducts?.length || 0,
+          calculatedBudget: lead.leadProducts?.reduce((sum: number, p: any) => sum + (p.total_amount || 0), 0) || lead.budget || 0
         }))
         
         console.log("loadLeads - API leads:", transformedLeads)
@@ -108,9 +235,9 @@ export function LeadsContent() {
         ).length
         const conversionRate = transformedLeads.length > 0 ? Math.round((qualifiedLeads / transformedLeads.length) * 100) : 0
         
-        // Calculate total pipeline value from all budgets
+        // Calculate total pipeline value from calculated budgets (multiple products support)
         const totalPipelineValue = transformedLeads.reduce((sum: number, lead: any) => {
-          const budget = parseFloat(lead.budget) || 0
+          const budget = parseFloat(lead.calculatedBudget) || parseFloat(lead.budget) || 0
           return sum + budget
         }, 0)
         
@@ -296,6 +423,9 @@ export function LeadsContent() {
   }
 
   const handleEditLead = (lead: any) => {
+    console.log('=== EDIT LEAD CLICKED ===')
+    console.log('Lead data being passed to edit modal:', lead)
+    console.log('Lead products:', lead.leadProducts)
     setEditingLead(lead)
     setIsAddLeadModalOpen(true) // Use the new simplified modal for editing
   }
@@ -331,7 +461,9 @@ export function LeadsContent() {
         price_per_unit: leadData.price_per_unit,
         expected_closing_date: leadData.expected_closing_date,
         next_followup_date: leadData.next_followup_date,
-        notes: leadData.notes
+        notes: leadData.notes,
+        // Include selected products for multiple product support
+        selected_products: leadData.selected_products
       }
       
       // Check if lead status is changing to "Qualified" (for deal creation)
@@ -468,12 +600,18 @@ export function LeadsContent() {
   }
 
   const createDealFromLead = async (lead: any) => {
+    
+    // Determine primary product name for deal name
+    const primaryProductName = lead.leadProducts && lead.leadProducts.length > 0 
+      ? lead.leadProducts[0].product_name 
+      : lead.product_name || 'Products'
+    
     const dealData = {
-      deal_name: `${lead.account_name} - ${lead.product_name}`,
+      deal_name: `${lead.account_name} - ${primaryProductName}${lead.leadProducts && lead.leadProducts.length > 1 ? ` +${lead.leadProducts.length - 1} more` : ''}`,
       account_name: lead.account_name,
-      contact_person: lead.contact_name,
-      product: lead.product_name,
-      value: lead.budget || 0,
+      contact_person: lead.contact_name || lead.lead_name || 'Unknown Contact',
+      product: primaryProductName, // Keep for backward compatibility
+      value: lead.calculatedBudget || lead.budget || 0,
       stage: 'Qualification',
       probability: 25,
       expected_close_date: lead.expected_closing_date,
@@ -501,6 +639,9 @@ export function LeadsContent() {
       state: lead.state,
       department: lead.department,
       
+      // Products will be fetched and added below
+      selected_products: [],
+      
       // Copy lead tracking and dates
       lead_date: lead.lead_date,
       closing_date: lead.closing_date,
@@ -512,6 +653,49 @@ export function LeadsContent() {
       quantity: lead.quantity,
       price_per_unit: lead.price_per_unit
     }
+
+    // Get REAL products from lead_products table
+    try {
+      console.log(`Fetching products for lead ${lead.id} (${lead.account_name})`);
+      const leadProductsResponse = await fetch(`/api/leads/${lead.id}/products`);
+      const leadProductsData = await leadProductsResponse.json();
+      const realProducts = leadProductsData.products || [];
+      
+      console.log(`Lead ${lead.account_name} has ${realProducts.length} products:`, realProducts);
+      
+      if (realProducts.length > 0) {
+        dealData.selected_products = realProducts.map((product: any) => ({
+          product_id: null, // Handle invalid UUIDs
+          product_name: product.product_name,
+          quantity: product.quantity || 1,
+          price_per_unit: product.price_per_unit || 0,
+          total_amount: (product.quantity || 1) * (product.price_per_unit || 0)
+        }));
+      } else if (lead.product_name) {
+        // Fallback to legacy single product
+        dealData.selected_products = [{
+          product_id: null,
+          product_name: lead.product_name,
+          quantity: lead.quantity || 1,
+          price_per_unit: lead.price_per_unit || 0,
+          total_amount: (lead.quantity || 1) * (lead.price_per_unit || 0)
+        }];
+      }
+    } catch (error) {
+      console.error('Error fetching lead products for conversion:', error);
+      // Fallback to legacy approach
+      if (lead.product_name) {
+        dealData.selected_products = [{
+          product_id: null,
+          product_name: lead.product_name,
+          quantity: lead.quantity || 1,
+          price_per_unit: lead.price_per_unit || 0,
+          total_amount: (lead.quantity || 1) * (lead.price_per_unit || 0)
+        }];
+      }
+    }
+
+    console.log('Final deal data with products:', dealData);
 
     const response = await fetch('/api/deals', {
       method: 'POST',
@@ -722,16 +906,15 @@ export function LeadsContent() {
                   {/* Product Details - beside contact */}
                   <div className="ml-14">
                     <div className="flex items-start gap-x-14">
-                      <p className="text-sm font-medium">{lead.product}</p>
+                      {/* Smart Products Display */}
+                      <ProductsDisplay 
+                        leadProducts={lead.leadProducts} 
+                        totalBudget={lead.calculatedBudget} 
+                      />
                       <div className="text-xs text-gray-500">
                         <p>Stage: {lead.leadStatus || lead.salesStage}</p>
                         <p>Assigned to: {lead.assignedTo}</p>
                       </div>
-                    </div>
-                    <div className="text-xs text-gray-500 space-y-1 mt-1">
-                      {lead.quantity && <p>Quantity: {lead.quantity}</p>}
-                      {lead.pricePerUnit && <p>Price/Unit: ₹{lead.pricePerUnit}</p>}
-                      {lead.budget && <p>Budget: ₹{lead.budget}</p>}
                     </div>
                   </div>
                 </div>

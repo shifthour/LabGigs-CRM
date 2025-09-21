@@ -8,26 +8,38 @@
   }
   
   .custom-scrollbar {
-    overflow-y: scroll !important;
+    overflow-y: auto !important;
+    scroll-behavior: smooth;
   }
   
   .custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
     display: block !important;
   }
   
   .custom-scrollbar::-webkit-scrollbar-track {
-    background: #f3f4f6;
-    border-radius: 4px;
+    background: transparent;
+    border-radius: 3px;
   }
   
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #9ca3af;
-    border-radius: 4px;
+    background: #d1d5db;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
   }
   
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:active {
     background: #6b7280;
+  }
+  
+  /* For Firefox */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
   }
 }
 

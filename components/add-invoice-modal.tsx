@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,11 +11,13 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Receipt, Plus, Minus, User, FileText, IndianRupee, Settings, Save, X, Calendar } from "lucide-react"
+import { Receipt, Plus, Minus, User, FileText, Settings, Save, X, Calendar, ShoppingCart } from "lucide-react"
 
 interface AddInvoiceModalProps {
   isOpen: boolean
   onClose: () => void
+  onSave: (invoiceData: any) => void
+  editingData?: any
 }
 
 interface InvoiceItem {
@@ -71,7 +73,7 @@ interface FormData {
   branchName: string
 }
 
-export function AddInvoiceModal({ isOpen, onClose }: AddInvoiceModalProps) {
+export function AddInvoiceModal({ isOpen, onClose, onSave, editingData }: AddInvoiceModalProps) {
   const [formData, setFormData] = useState<FormData>({
     accountName: "",
     contactPerson: "",
@@ -119,6 +121,157 @@ export function AddInvoiceModal({ isOpen, onClose }: AddInvoiceModalProps) {
   ])
 
   const [activeTab, setActiveTab] = useState("customer")
+
+  // Populate form data when editingData is provided (for quotation/sales order conversion)
+  useEffect(() => {
+    if (editingData) {
+      console.log("AddInvoiceModal - editingData received:", editingData)
+      console.log("=== INVOICE MODAL DEBUG START ===")
+      console.log("editingData.products_quoted:", editingData.products_quoted)
+      console.log("editingData.product:", editingData.product)
+      console.log("editingData.product_description:", editingData.product_description)
+      console.log("editingData.description:", editingData.description)
+      console.log("=== INVOICE MODAL DEBUG END ===")
+      // Determine if this is from a quotation or sales order
+      const isFromQuotation = editingData.quote_number || editingData.quotationId
+      const isFromSalesOrder = editingData.order_id || editingData.orderId
+      
+      const sourceReference = isFromQuotation 
+        ? `Generated from Quotation: ${editingData.quote_number || editingData.quotationId || editingData.id}`
+        : `Generated from Sales Order: ${editingData.order_id || editingData.orderId || editingData.id}`
+
+      setFormData(prev => ({
+        ...prev,
+        accountName: editingData.customer_name || editingData.account || "",
+        contactPerson: editingData.contact_person || editingData.contactName || "",
+        customerEmail: editingData.customer_email || editingData.customerEmail || "",
+        customerPhone: editingData.customer_phone || editingData.customerPhone || "",
+        billingAddress: editingData.billing_address || editingData.billingAddress || "",
+        shippingAddress: editingData.shipping_address || editingData.shippingAddress || "",
+        salesOrderRef: isFromSalesOrder 
+          ? (editingData.order_id || editingData.orderId || editingData.id) 
+          : (editingData.quote_number || editingData.quotationId || editingData.id),
+        notes: editingData.notes ? `${editingData.notes}\n\n${sourceReference}` : sourceReference,
+        assignedTo: editingData.assigned_to || editingData.assignedTo || "",
+        priority: editingData.priority || "Medium",
+        paymentMethod: editingData.payment_terms || editingData.paymentMethod || "Bank Transfer"
+      }))
+
+      // Handle items from either quotations or sales orders
+      const itemsArray = editingData.line_items || editingData.items
+      if (itemsArray && itemsArray.length > 0) {
+        console.log("AddInvoiceModal - Processing items from editingData:", itemsArray)
+        const convertedItems = itemsArray.map((item: any, index: number) => {
+          // Handle different field name variations
+          const quantity = item.quantity || item.qty || 1
+          const unitPrice = item.unitPrice || item.unit_price || item.price || 0
+          const discount = item.discount || item.discount_percent || 0
+          const taxRate = item.taxRate || item.tax_rate || item.gst_rate || 18
+          
+          console.log("Converting item:", {
+            original: item,
+            extracted: { quantity, unitPrice, discount, taxRate }
+          })
+          
+          // Calculate amounts properly
+          const subtotal = quantity * unitPrice
+          const discountAmount = subtotal * (discount / 100)
+          const taxableAmount = subtotal - discountAmount
+          const taxAmount = taxableAmount * (taxRate / 100)
+          const amount = taxableAmount + taxAmount
+          
+          return {
+            id: String(index + 1),
+            product: item.product || item.product_name || "",
+            description: item.description || item.product_description || "",
+            hsnCode: item.hsnCode || item.hsn_code || "",
+            quantity,
+            unitPrice,
+            discount,
+            taxRate,
+            taxAmount,
+            amount
+          }
+        })
+        console.log("AddInvoiceModal - Setting converted items:", convertedItems)
+        setItems(convertedItems)
+      } else if (editingData.total_amount || editingData.amount) {
+        // Handle multiple products or single product
+        const totalAmount = editingData.total_amount || editingData.amount || 0
+        const productString = editingData.products_quoted || editingData.product || editingData.productName || ""
+        console.log("AddInvoiceModal - Processing single/multiple products:", {
+          totalAmount,
+          productString,
+          products_quoted: editingData.products_quoted,
+          product: editingData.product,
+          productName: editingData.productName
+        })
+        
+        if (productString && productString.includes(',')) {
+          // Handle multiple products separated by commas
+          const productNames = productString.split(',')
+          const pricePerProduct = totalAmount / productNames.length
+          
+          const multipleItems = productNames.map((productName: string, index: number) => {
+            const quantity = 1
+            const discount = 0
+            const taxRate = 18
+            
+            // Calculate for each product
+            const taxableAmount = pricePerProduct / (1 + taxRate / 100)
+            const unitPrice = taxableAmount / quantity
+            const taxAmount = taxableAmount * (taxRate / 100)
+            
+            return {
+              id: String(index + 1),
+              product: productName.trim(),
+              description: editingData.product_description || editingData.description || `${productName.trim()} - High quality laboratory equipment`,
+              hsnCode: "",
+              quantity,
+              unitPrice,
+              discount,
+              taxRate,
+              taxAmount,
+              amount: pricePerProduct
+            }
+          })
+          
+          console.log("AddInvoiceModal - Setting multiple items:", multipleItems)
+          setItems(multipleItems)
+        } else {
+          // Single item based on total amount - reverse calculate from total
+          const quantity = 1
+          const discount = 0
+          const taxRate = 18
+          
+          // Reverse calculate: if total includes tax, find the base price
+          const taxableAmount = totalAmount / (1 + taxRate / 100)
+          const unitPrice = taxableAmount / quantity
+          const taxAmount = taxableAmount * (taxRate / 100)
+          
+          setItems([{
+            id: "1",
+            product: productString,
+            description: editingData.product_description || editingData.description || `${productString} - Professional laboratory equipment`,
+            hsnCode: "",
+            quantity,
+            unitPrice,
+            discount,
+            taxRate,
+            taxAmount,
+            amount: totalAmount
+          }])
+          console.log("AddInvoiceModal - Setting single item:", {
+            product: productString,
+            description: editingData.product_description || editingData.description || "",
+            unitPrice,
+            taxAmount,
+            amount: totalAmount
+          })
+        }
+      }
+    }
+  }, [editingData])
 
   const handleInputChange = (field: keyof FormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -200,19 +353,87 @@ export function AddInvoiceModal({ isOpen, onClose }: AddInvoiceModalProps) {
   const handleSubmit = () => {
     const totals = calculateTotals()
     const invoiceData = {
-      ...formData,
       items,
       totals,
-      invoiceId: `INV-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`
+      invoice_number: `INV-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`,
+      customer_name: formData.accountName,
+      contact_person: formData.contactPerson,
+      customer_email: formData.customerEmail,
+      customer_phone: formData.customerPhone,
+      billing_address: formData.billingAddress,
+      shipping_address: formData.shippingAddress,
+      invoice_date: formData.invoiceDate,
+      due_date: formData.dueDate,
+      total_amount: totals.grandTotal,
+      status: 'draft',
+      payment_status: 'unpaid',
+      payment_method: formData.paymentTerms || 'Bank Transfer',
+      priority: 'Medium',
+      gst_number: formData.gstNumber,
+      pan_number: formData.panNumber,
+      notes: formData.notes,
+      assigned_to: formData.assignedTo,
+      bank_name: formData.bankName,
+      branch_name: formData.branchName,
+      account_number: formData.accountNumber,
+      ifsc_code: formData.ifscCode,
+      company_id: 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
     }
     
+    console.log("=== INVOICE DATA BEING SENT ===")
     console.log("Invoice Data:", invoiceData)
-    onClose()
+    console.log("Fields in invoiceData:", Object.keys(invoiceData))
+    console.log("accountName present?", 'accountName' in invoiceData)
+    console.log("customer_name value:", invoiceData.customer_name)
+    onSave(invoiceData)
   }
 
   // Options
-  const accounts = ["TSAR Labcare", "Eurofins Advinus", "Kerala Agricultural University", "JNCASR", "Guna Foods", "Bio-Rad Laboratories"]
-  const products = ["TRICOLOR MULTICHANNEL FIBRINOMETER", "LABORATORY FREEZE DRYER/LYOPHILIZER", "ND 1000 Spectrophotometer", "Automated Media Preparator", "Bio-Safety Cabinet"]
+  const baseAccounts = ["TSAR Labcare", "Eurofins Advinus", "Kerala Agricultural University", "JNCASR", "Guna Foods", "Bio-Rad Laboratories"]
+  
+  // Add customer name from editingData to accounts if it's not already there
+  let accounts = [...baseAccounts]
+  if (editingData?.customer_name || editingData?.account) {
+    const customerName = editingData.customer_name || editingData.account
+    if (!baseAccounts.includes(customerName)) {
+      accounts = [customerName, ...baseAccounts]
+    }
+  }
+  const baseProducts = ["TRICOLOR MULTICHANNEL FIBRINOMETER", "LABORATORY FREEZE DRYER/LYOPHILIZER", "ND 1000 Spectrophotometer", "Automated Media Preparator", "Bio-Safety Cabinet"]
+  
+  // Add products from editingData to products list if they're not already there
+  let products = [...baseProducts]
+  
+  if (editingData?.items) {
+    editingData.items.forEach((item: any) => {
+      if (item.product && !products.includes(item.product)) {
+        products.unshift(item.product)
+      }
+    })
+  } else if (editingData?.products_quoted || editingData?.product) {
+    const productString = editingData.products_quoted || editingData.product
+    console.log("Processing productString:", productString)
+    
+    if (productString) {
+      if (productString.includes(',')) {
+        // Handle multiple products separated by commas
+        const productNames = productString.split(',').map((p: string) => p.trim())
+        console.log("Split product names:", productNames)
+        productNames.forEach((productName: string) => {
+          if (productName && !products.includes(productName)) {
+            products.unshift(productName)
+          }
+        })
+      } else {
+        // Single product
+        if (!products.includes(productString)) {
+          products.unshift(productString)
+        }
+      }
+    }
+  }
+  
+  console.log("Final products array:", products)
   const assignees = ["Hari Kumar K", "Prashanth Sandilya", "Vijay Muppala", "Pauline"]
   const priorities = ["Low", "Medium", "High", "Urgent"]
   const paymentStatuses = ["Unpaid", "Partially Paid", "Paid", "Overdue", "Cancelled"]
@@ -224,10 +445,10 @@ export function AddInvoiceModal({ isOpen, onClose }: AddInvoiceModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2 text-xl">
-            <Receipt className="w-6 h-6 text-blue-600" />
+            <FileText className="w-6 h-6 text-blue-600" />
             <span>Create New Invoice</span>
           </DialogTitle>
           <DialogDescription>
@@ -246,7 +467,7 @@ export function AddInvoiceModal({ isOpen, onClose }: AddInvoiceModalProps) {
               <span>Invoice Details</span>
             </TabsTrigger>
             <TabsTrigger value="items" className="flex items-center space-x-2">
-              <IndianRupee className="w-4 h-4" />
+              <span>📋</span>
               <span>Items & Tax</span>
             </TabsTrigger>
             <TabsTrigger value="payment" className="flex items-center space-x-2">
@@ -416,25 +637,14 @@ export function AddInvoiceModal({ isOpen, onClose }: AddInvoiceModalProps) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="salesOrderRef" className="text-sm font-medium">Sales Order Reference</Label>
+                    <Label htmlFor="salesOrderRef" className="text-sm font-medium">Sales Order Reference/Quotation Reference</Label>
                     <Input
                       id="salesOrderRef"
                       value={formData.salesOrderRef}
                       onChange={(e) => handleInputChange("salesOrderRef", e.target.value)}
-                      placeholder="SO-2025-001"
-                      className="mt-1"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="challanNumber" className="text-sm font-medium">Delivery Challan No.</Label>
-                    <Input
-                      id="challanNumber"
-                      value={formData.challanNumber}
-                      onChange={(e) => handleInputChange("challanNumber", e.target.value)}
-                      placeholder="DC-001"
+                      placeholder="SO-2025-001 or QT-2025-001"
                       className="mt-1"
                     />
                   </div>
@@ -526,15 +736,15 @@ export function AddInvoiceModal({ isOpen, onClose }: AddInvoiceModalProps) {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Product/Service</TableHead>
-                        <TableHead>Description</TableHead>
+                        <TableHead className="w-48">Product/Service</TableHead>
+                        <TableHead className="w-40">Description</TableHead>
                         <TableHead className="w-20">HSN Code</TableHead>
-                        <TableHead className="w-16">Qty</TableHead>
-                        <TableHead className="w-24">Unit Price</TableHead>
-                        <TableHead className="w-16">Disc %</TableHead>
-                        <TableHead className="w-16">Tax %</TableHead>
-                        <TableHead className="w-24">Tax Amount</TableHead>
-                        <TableHead className="w-24">Amount</TableHead>
+                        <TableHead className="w-14">Qty</TableHead>
+                        <TableHead className="w-20">Unit Price</TableHead>
+                        <TableHead className="w-14">Disc %</TableHead>
+                        <TableHead className="w-14">Tax %</TableHead>
+                        <TableHead className="w-20">Tax Amount</TableHead>
+                        <TableHead className="w-20">Amount</TableHead>
                         <TableHead className="w-12">Action</TableHead>
                       </TableRow>
                     </TableHeader>

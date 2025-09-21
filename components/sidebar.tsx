@@ -34,6 +34,7 @@ import {
   Zap,
   ChevronDown,
   ChevronUp,
+  Headphones,
 } from "lucide-react"
 
 
@@ -127,6 +128,7 @@ export function Sidebar() {
         { name: "Installations", href: "/installations", icon: Wrench, badge: getBadge("/installations") },
         { name: "AMC", href: "/amc", icon: Calendar, badge: getBadge("/amc") },
         { name: "Complaints", href: "/complaints", icon: AlertTriangle, badge: getBadge("/complaints") },
+        { name: "Support", href: "/support", icon: Headphones, badge: getBadge("/support") },
         { name: "Activities", href: "/activities", icon: Activity, badge: getBadge("/activities") },
       ]
     },
@@ -147,7 +149,7 @@ export function Sidebar() {
       type: "category",
       children: [
         { name: "Conversations", href: "/conversations", icon: MessageSquare, badge: null },
-        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
+        // { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
       ]
     },
     { name: "Integrations", href: "/integrations", icon: Zap, badge: null, type: "item" },

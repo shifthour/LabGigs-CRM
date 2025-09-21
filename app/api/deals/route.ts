@@ -37,20 +37,32 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const { selected_products, ...dealData } = body
     
     // Use default company ID if not provided
     const companyId = body.companyId || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
 
-    const dealData = {
-      ...body,
+    const dealToInsert = {
+      ...dealData,
       company_id: companyId,
       created_by: 'System',
       updated_by: 'System'
     }
 
+    // Remove selected_products from the main deal data and any undefined/null fields
+    Object.keys(dealToInsert).forEach(key => {
+      if (dealToInsert[key] === undefined || dealToInsert[key] === '' || key === 'selected_products') {
+        if (key === 'selected_products') {
+          delete dealToInsert[key]
+        } else {
+          dealToInsert[key] = null
+        }
+      }
+    })
+
     const { data: deal, error } = await supabase
       .from('deals')
-      .insert([dealData])
+      .insert([dealToInsert])
       .select()
       .single()
 
@@ -60,6 +72,32 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create deal' },
         { status: 500 }
       )
+    }
+
+    // Insert selected products into deal_products table
+    if (selected_products && selected_products.length > 0) {
+      console.log('Inserting deal products:', selected_products)
+      const dealProducts = selected_products.map((product: any) => ({
+        deal_id: deal.id,
+        product_id: product.product_id,
+        product_name: product.product_name,
+        quantity: product.quantity,
+        price_per_unit: product.price_per_unit,
+        notes: product.notes || null
+      }))
+
+      const { error: productsError } = await supabase
+        .from('deal_products')
+        .insert(dealProducts)
+
+      if (productsError) {
+        console.error('Error inserting deal products:', productsError)
+        console.error('Deal products data that failed:', dealProducts)
+        console.error('Full error details:', JSON.stringify(productsError, null, 2))
+        // Don't fail the entire operation, just log the error
+      } else {
+        console.log('Successfully inserted deal products:', dealProducts.length, 'products')
+      }
     }
 
     return NextResponse.json({ deal })

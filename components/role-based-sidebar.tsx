@@ -84,22 +84,23 @@ const roleBasedNavigation = {
         { name: "Complaints", href: "/complaints", icon: AlertTriangle, badge: null },
       ]
     },
-    {
-      name: "Projects",
-      icon: Briefcase, 
-      type: "category",
-      children: [
-        { name: "Projects", href: "/projects", icon: Briefcase, badge: null },
-        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
-      ]
-    },
+    // {
+    //   name: "Projects",
+    //   icon: Briefcase, 
+    //   type: "category",
+    //   children: [
+    //     { name: "Projects", href: "/projects", icon: Briefcase, badge: null },
+    //     { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
+    //   ]
+    // },
     {
       name: "Support",
       icon: LifeBuoy,
       type: "category",
       children: [
-        { name: "Cases", href: "/cases", icon: Ticket, badge: null },
-        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
+        { name: "Support Center", href: "/support", icon: LifeBuoy, badge: null },
+        // { name: "Cases", href: "/cases", icon: Ticket, badge: null },
+        // { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
       ]
     },
     {
@@ -126,22 +127,23 @@ const roleBasedNavigation = {
         { name: "Complaints", href: "/complaints", icon: AlertTriangle, badge: null },
       ]
     },
-    {
-      name: "Projects",
-      icon: Briefcase,
-      type: "category",
-      children: [
-        { name: "Projects", href: "/projects", icon: Briefcase, badge: null },
-        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
-      ]
-    },
+    // {
+    //   name: "Projects",
+    //   icon: Briefcase,
+    //   type: "category",
+    //   children: [
+    //     { name: "Projects", href: "/projects", icon: Briefcase, badge: null },
+    //     { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
+    //   ]
+    // },
     {
       name: "Support",
       icon: LifeBuoy,
       type: "category",
       children: [
-        { name: "Cases", href: "/cases", icon: Ticket, badge: null },
-        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
+        { name: "Support Center", href: "/support", icon: LifeBuoy, badge: null },
+        // { name: "Cases", href: "/cases", icon: Ticket, badge: null },
+        // { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
       ]
     },
     {
@@ -188,22 +190,23 @@ const roleBasedNavigation = {
         { name: "Complaints", href: "/complaints", icon: AlertTriangle, badge: null },
       ]
     },
-    {
-      name: "Projects",
-      icon: Briefcase,
-      type: "category",
-      children: [
-        { name: "Projects", href: "/projects", icon: Briefcase, badge: null },
-        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
-      ]
-    },
+    // {
+    //   name: "Projects",
+    //   icon: Briefcase,
+    //   type: "category",
+    //   children: [
+    //     { name: "Projects", href: "/projects", icon: Briefcase, badge: null },
+    //     { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
+    //   ]
+    // },
     {
       name: "Support",
       icon: LifeBuoy,
       type: "category",
       children: [
-        { name: "Cases", href: "/cases", icon: Ticket, badge: null },
-        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
+        { name: "Support Center", href: "/support", icon: LifeBuoy, badge: null },
+        // { name: "Cases", href: "/cases", icon: Ticket, badge: null },
+        // { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
       ]
     },
     {
@@ -219,23 +222,24 @@ const roleBasedNavigation = {
   "Project Manager": [
     { name: "Dashboard", href: "/", icon: Home, badge: null, type: "item" },
     { name: "Activities", href: "/activities", icon: Activity, badge: null, type: "item" },
-    {
-      name: "Projects",
-      icon: Briefcase,
-      type: "category",
-      children: [
-        { name: "Projects", href: "/projects", icon: Briefcase, badge: null },
-        { name: "Installations", href: "/installations", icon: Wrench, badge: null },
-        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
-      ]
-    },
+    // {
+    //   name: "Projects",
+    //   icon: Briefcase,
+    //   type: "category",
+    //   children: [
+    //     { name: "Projects", href: "/projects", icon: Briefcase, badge: null },
+    //     { name: "Installations", href: "/installations", icon: Wrench, badge: null },
+    //     { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
+    //   ]
+    // },
     {
       name: "Support",
       icon: LifeBuoy,
       type: "category",
       children: [
-        { name: "Cases", href: "/cases", icon: Ticket, badge: null },
-        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
+        { name: "Support Center", href: "/support", icon: LifeBuoy, badge: null },
+        // { name: "Cases", href: "/cases", icon: Ticket, badge: null },
+        // { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
       ]
     },
     {
@@ -267,8 +271,9 @@ const roleBasedNavigation = {
       icon: LifeBuoy,
       type: "category",
       children: [
-        { name: "Cases", href: "/cases", icon: Ticket, badge: null },
-        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
+        { name: "Support Center", href: "/support", icon: LifeBuoy, badge: null },
+        // { name: "Cases", href: "/cases", icon: Ticket, badge: null },
+        // { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
       ]
     },
     {
@@ -315,22 +320,23 @@ const roleBasedNavigation = {
         { name: "Complaints", href: "/complaints", icon: AlertTriangle, badge: null },
       ]
     },
-    {
-      name: "Projects",
-      icon: Briefcase,
-      type: "category",
-      children: [
-        { name: "Projects", href: "/projects", icon: Briefcase, badge: null },
-        { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
-      ]
-    },
+    // {
+    //   name: "Projects",
+    //   icon: Briefcase,
+    //   type: "category",
+    //   children: [
+    //     { name: "Projects", href: "/projects", icon: Briefcase, badge: null },
+    //     { name: "Gig Workspace", href: "/gig-workspace", icon: Users, badge: null },
+    //   ]
+    // },
     {
       name: "Support",
       icon: LifeBuoy,
       type: "category",
       children: [
-        { name: "Cases", href: "/cases", icon: Ticket, badge: null },
-        { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
+        { name: "Support Center", href: "/support", icon: LifeBuoy, badge: null },
+        // { name: "Cases", href: "/cases", icon: Ticket, badge: null },
+        // { name: "Solutions", href: "/solutions", icon: Lightbulb, badge: null },
       ]
     },
     {
