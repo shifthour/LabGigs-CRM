@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { DM_Sans } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
+import { Toaster as Sonner } from "@/components/ui/sonner"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -26,6 +27,7 @@ export default function RootLayout({
       <body className={`${dmSans.variable} ${dmSans.className}`}>
         {children}
         <Toaster />
+        <Sonner />
         <script 
           dangerouslySetInnerHTML={{
             __html: `

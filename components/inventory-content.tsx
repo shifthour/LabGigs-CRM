@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Package, FileText, ShoppingCart, Receipt, Plus, ArrowRight, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react"
+import { Package, FileText, ShoppingCart, Receipt, Plus, ArrowRight, TrendingUp, TrendingDown, AlertTriangle, ArrowDownToLine, ArrowUpFromLine } from "lucide-react"
 
 export function InventoryContent() {
   const inventoryStats = [
@@ -55,7 +55,15 @@ export function InventoryContent() {
       color: "bg-blue-600"
     },
     {
-      title: "Quotations", 
+      title: "Stock Entries",
+      description: "Manage stock inward and outward entries",
+      icon: ArrowDownToLine,
+      href: "/stock-entries",
+      badge: "New",
+      color: "bg-purple-600"
+    },
+    {
+      title: "Quotations",
       description: "Create and manage price quotations",
       icon: FileText,
       href: "/quotations",
@@ -66,9 +74,9 @@ export function InventoryContent() {
       title: "Sales Orders",
       description: "Track and process customer orders",
       icon: ShoppingCart,
-      href: "/sales-orders", 
+      href: "/sales-orders",
       badge: "23",
-      color: "bg-purple-600"
+      color: "bg-teal-600"
     },
     {
       title: "Invoices",
@@ -170,7 +178,7 @@ export function InventoryContent() {
           <CardDescription>Access key inventory management functions</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {quickActions.map((action, index) => (
               <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer">
                 <CardContent className="p-6">

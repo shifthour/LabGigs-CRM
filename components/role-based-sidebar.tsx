@@ -45,6 +45,7 @@ import {
   Lightbulb,
   Receipt,
   CheckCircle,
+  ArrowDownToLine,
 } from "lucide-react"
 
 // Define user roles and their accessible modules with categorized structure based on Zoho CRM design
@@ -69,6 +70,7 @@ const roleBasedNavigation = {
       type: "category",
       children: [
         { name: "Products", href: "/products", icon: Package, badge: null },
+        { name: "Stock Entries", href: "/stock-entries", icon: ArrowDownToLine, badge: null },
         { name: "Quotations", href: "/quotations", icon: FileText, badge: null },
         { name: "Sales Orders", href: "/sales-orders", icon: ShoppingCart, badge: null },
         { name: "Invoices", href: "/invoices", icon: FileText, badge: null },
@@ -305,6 +307,7 @@ const roleBasedNavigation = {
       type: "category",
       children: [
         { name: "Products", href: "/products", icon: Package, badge: null },
+        { name: "Stock Entries", href: "/stock-entries", icon: ArrowDownToLine, badge: null },
         { name: "Quotations", href: "/quotations", icon: FileText, badge: null },
         { name: "Sales Orders", href: "/sales-orders", icon: ShoppingCart, badge: null },
         { name: "Invoices", href: "/invoices", icon: FileText, badge: null },
