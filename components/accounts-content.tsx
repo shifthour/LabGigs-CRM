@@ -42,6 +42,10 @@ interface Account {
   createdAt?: string
   updatedAt?: string
   lastActivity?: string
+  customerSegment?: string
+  accountType?: string
+  accountIndustry?: string
+  subIndustry?: string
 }
 
 const industries = ["All", "Biotech Company", "Dealer", "Educational Institutions", "Food and Beverages", "Hair Transplant Clinics/ Hospitals", "Molecular Diagnostics", "Pharmaceutical", "Research", "SRO", "Training Institute", "Universities"]
@@ -126,23 +130,31 @@ export function AccountsContent() {
       console.log("Total count from API:", data.total)
       
       // Map API data to component format
-      const mappedAccounts = (data.accounts || []).map((account: any) => ({
-        id: account.id,
-        accountName: account.account_name,
-        city: account.billing_city,
-        state: account.billing_state,
-        country: account.billing_country || account.country || 'India',
-        address: account.address,
-        billing_street: account.billing_street,
-        contactName: account.contact_name || '',
-        contactNo: account.phone,
-        email: account.email,
-        website: account.website,
-        assignedTo: account.assigned_to || account.owner?.full_name || '',
-        industry: account.industry,
-        status: account.status || 'Active',
-        createdAt: account.created_at
-      }))
+      const mappedAccounts = (data.accounts || []).map((account: any) => {
+        console.log('Full account data from API:', account)
+
+        return {
+          id: account.id,
+          accountName: account.account_name,
+          city: account.billing_city,
+          state: account.billing_state,
+          country: account.billing_country || account.country || 'India',
+          address: account.address,
+          billing_street: account.billing_street,
+          contactName: account.contact_name || '',
+          contactNo: account.main_phone || account.phone || account.contact_phone || account.billing_phone,
+          email: account.email || account.contact_email,
+          website: account.website,
+          assignedTo: account.owner?.full_name || account.assigned_to || '',
+          industry: account.industry,
+          status: account.status || 'Active',
+          createdAt: account.created_at,
+          customerSegment: account.customer_segment || account.acct_customer_segment,
+          accountType: account.account_type,
+          accountIndustry: account.acct_industry,
+          subIndustry: account.acct_sub_industry
+        }
+      })
       
       console.log("Mapped accounts:", mappedAccounts)
       setAccounts(mappedAccounts)
@@ -162,15 +174,16 @@ export function AccountsContent() {
         return createdDate.getMonth() === currentMonth && createdDate.getFullYear() === currentYear
       }).length
 
-      // Calculate most active industry
+      // Calculate most active industry - check both industry fields
       const industryCount = mappedAccounts.reduce((acc: any, account: any) => {
-        if (account.industry && account.industry.trim()) {
-          acc[account.industry] = (acc[account.industry] || 0) + 1
+        const industryValue = account.accountIndustry || account.industry
+        if (industryValue && industryValue.trim()) {
+          acc[industryValue] = (acc[industryValue] || 0) + 1
         }
         return acc
       }, {})
-      
-      const mostActiveIndustry = Object.keys(industryCount).length > 0 
+
+      const mostActiveIndustry = Object.keys(industryCount).length > 0
         ? Object.keys(industryCount).reduce((a, b) => industryCount[a] > industryCount[b] ? a : b)
         : 'N/A'
       const mostActiveIndustryCount = industryCount[mostActiveIndustry] || 0
@@ -231,30 +244,13 @@ export function AccountsContent() {
   })
 
   const handleAddAccount = () => {
-    setFormData({
-      accountName: "",
-      industry: "",
-      contactName: "",
-      contactNo: "",
-      email: "",
-      website: "",
-      city: "",
-      state: "",
-      country: "",
-      assignedTo: "",
-      status: "Active"
-    })
-    setIsAddAccountOpen(true)
+    // Navigate to the dynamic add account page
+    router.push('/accounts/add')
   }
 
   const handleEditAccount = (account: Account) => {
-    setEditingAccount(account)
-    // Map billing_street to address for the form
-    setFormData({
-      ...account,
-      address: account.billing_street || account.address || ''
-    })
-    setIsEditAccountOpen(true)
+    // Navigate to the dynamic edit account page
+    router.push(`/accounts/edit/${account.id}`)
   }
 
   const handleDeleteAccount = async (id: string) => {
@@ -601,7 +597,10 @@ export function AccountsContent() {
         sheetName: 'Accounts',
         columns: [
           { key: 'accountName', label: 'Company Name', width: 20 },
-          { key: 'industry', label: 'Industry', width: 15 },
+          { key: 'customerSegment', label: 'Customer Segment', width: 18 },
+          { key: 'accountType', label: 'Account Type', width: 18 },
+          { key: 'accountIndustry', label: 'Industry', width: 18 },
+          { key: 'subIndustry', label: 'Sub-Industry', width: 18 },
           { key: 'city', label: 'City', width: 15 },
           { key: 'state', label: 'State', width: 15 },
           { key: 'country', label: 'Country', width: 15 },
@@ -858,32 +857,67 @@ export function AccountsContent() {
                           </span>
                         </div>
                         <p className="text-sm text-gray-600">{location}</p>
-                        <div className="text-xs text-gray-500 space-y-1">
-                          {account.contactName && <p>Contact: {account.contactName}</p>}
-                          {account.industry && <p>Industry: {account.industry}</p>}
-                        </div>
+                        {account.contactName && (
+                          <p className="text-xs text-gray-500 mt-1">Contact: {account.contactName}</p>
+                        )}
                       </div>
                     </div>
 
-                    {/* Center section - Contact details */}
-                    <div className="flex-1 flex flex-col items-center justify-center space-y-1">
-                      {account.contactNo && (
-                        <div className="flex items-center text-xs text-gray-500">
-                          <Phone className="w-3 h-3 mr-1" />
-                          <span>{account.contactNo}</span>
-                        </div>
-                      )}
-                      {account.email && (
-                        <div className="flex items-center text-xs text-gray-500">
-                          <Mail className="w-3 h-3 mr-1" />
-                          <span>{account.email}</span>
-                        </div>
-                      )}
-                      {account.website && (
-                        <div className="flex items-center text-xs">
-                          <span className="text-blue-600">{account.website}</span>
-                        </div>
-                      )}
+                    {/* Center section - Business & Contact details in 3 columns */}
+                    <div className="flex-1 grid grid-cols-3 gap-x-6 gap-y-1 px-6">
+                      {/* Column 1: Segment & Type */}
+                      <div className="space-y-1">
+                        {account.customerSegment && (
+                          <div className="text-xs">
+                            <span className="text-gray-500">Segment:</span>
+                            <span className="ml-2 text-gray-900">{account.customerSegment}</span>
+                          </div>
+                        )}
+                        {account.accountType && (
+                          <div className="text-xs">
+                            <span className="text-gray-500">Type:</span>
+                            <span className="ml-2 text-gray-900">{account.accountType}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Column 2: Industry & Sub-Industry */}
+                      <div className="space-y-1">
+                        {account.accountIndustry && (
+                          <div className="text-xs">
+                            <span className="text-gray-500">Industry:</span>
+                            <span className="ml-2 text-gray-900">{account.accountIndustry}</span>
+                          </div>
+                        )}
+                        {account.subIndustry && (
+                          <div className="text-xs">
+                            <span className="text-gray-500">Sub-Industry:</span>
+                            <span className="ml-2 text-gray-900">{account.subIndustry}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Column 3: Contact Information */}
+                      <div className="space-y-1">
+                        {account.contactNo && (
+                          <div className="text-xs flex items-center">
+                            <Phone className="w-3 h-3 mr-1 text-gray-500" />
+                            <span className="text-gray-900">{account.contactNo}</span>
+                          </div>
+                        )}
+                        {account.email && (
+                          <div className="text-xs flex items-center">
+                            <Mail className="w-3 h-3 mr-1 text-gray-500" />
+                            <span className="text-gray-900">{account.email}</span>
+                          </div>
+                        )}
+                        {account.website && (
+                          <div className="text-xs flex items-center">
+                            <Globe className="w-3 h-3 mr-1 text-gray-500" />
+                            <span className="text-blue-600">{account.website}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Right section - Assigned to and actions */}

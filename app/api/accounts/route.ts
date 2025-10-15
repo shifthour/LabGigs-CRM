@@ -25,11 +25,13 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = (page - 1) * limit
     
-    // Build query - no company_id filtering, show ALL accounts  
-    // Try without the join first to see if that's the issue
+    // Build query with user join to get owner name
     let query = supabase
       .from('accounts')
-      .select('*', { count: 'exact' })
+      .select(`
+        *,
+        owner:users!accounts_owner_id_fkey(id, full_name, email)
+      `, { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
     
@@ -47,9 +49,14 @@ export async function GET(request: NextRequest) {
     }
     
     const { data, error, count } = await query
-    
+
     console.log('Query executed. Error:', error, 'Data count:', data?.length, 'Total count:', count)
-    
+
+    // Debug: Log first account to see owner data
+    if (data && data.length > 0) {
+      console.log('Sample account data:', JSON.stringify(data[0], null, 2))
+    }
+
     if (error) {
       console.error('Error fetching accounts:', error)
       return NextResponse.json({ 
@@ -75,16 +82,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { companyId, ...accountData } = body
-    
+    const { companyId, userId, ...accountData } = body
+
     if (!companyId) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
-    
+
     if (!accountData.account_name) {
       return NextResponse.json({ error: 'Account name is required' }, { status: 400 })
     }
-    
+
     // Check for duplicate (same name AND city)
     const { data: existing } = await supabase
       .from('accounts')
@@ -93,18 +100,20 @@ export async function POST(request: NextRequest) {
       .eq('account_name', accountData.account_name)
       .eq('billing_city', accountData.billing_city || '')
       .single()
-    
+
     if (existing) {
-      return NextResponse.json({ 
-        error: `An account with name "${accountData.account_name}" already exists in ${accountData.billing_city || 'this city'}` 
+      return NextResponse.json({
+        error: `An account with name "${accountData.account_name}" already exists in ${accountData.billing_city || 'this city'}`
       }, { status: 400 })
     }
-    
-    // Create account
+
+    // Create account with owner_id set to current user
     const { data, error } = await supabase
       .from('accounts')
       .insert({
         company_id: companyId,
+        owner_id: userId || null,
+        created_by: userId || null,
         ...accountData
       })
       .select()
