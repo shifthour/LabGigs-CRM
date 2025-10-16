@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
 
-    // Fetch contacts - without joins for now since foreign keys aren't set up
+    // Fetch contacts
     let query = supabase
       .from('contacts')
       .select('*', { count: 'exact' })
@@ -29,8 +29,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    // Fetch account details for each contact
+    const contactsWithAccounts = await Promise.all(
+      (data || []).map(async (contact) => {
+        if (contact.account_id) {
+          const { data: accountData } = await supabase
+            .from('accounts')
+            .select('account_name, customer_segment, account_type, acct_industry, acct_sub_industry, billing_city, billing_state, billing_country, main_phone, primary_email, website')
+            .eq('id', contact.account_id)
+            .single()
+
+          return {
+            ...contact,
+            account: accountData
+          }
+        }
+        return contact
+      })
+    )
+
     return NextResponse.json({
-      contacts: data || [],
+      contacts: contactsWithAccounts || [],
       total: count || 0
     })
   } catch (error: any) {

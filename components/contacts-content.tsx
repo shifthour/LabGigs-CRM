@@ -21,6 +21,19 @@ interface Contact {
   lifecycle_stage: string
   current_contact_status: string
   created_at?: string
+  account?: {
+    account_name: string
+    customer_segment?: string
+    account_type?: string
+    acct_industry?: string
+    acct_sub_industry?: string
+    billing_city?: string
+    billing_state?: string
+    billing_country?: string
+    main_phone?: string
+    primary_email?: string
+    website?: string
+  }
 }
 
 export function ContactsContent() {
@@ -212,49 +225,109 @@ export function ContactsContent() {
               )}
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {filteredContacts.map((contact) => (
                 <div
                   key={contact.id}
-                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <User className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-gray-900">
-                          {contact.first_name} {contact.last_name}
-                        </h4>
-                        <p className="text-sm text-gray-600">{contact.job_title || 'No title'}</p>
-                      </div>
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <User className="w-6 h-6 text-blue-600" />
                     </div>
-                    <div className="mt-2 ml-13 grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                      {contact.company_name && (
-                        <div className="flex items-center text-gray-600">
-                          <Building2 className="w-4 h-4 mr-1" />
-                          {contact.company_name}
-                        </div>
-                      )}
-                      <div className="flex items-center text-gray-600">
-                        <Mail className="w-4 h-4 mr-1" />
-                        {contact.email_primary}
-                      </div>
-                      <div className="flex items-center text-gray-600">
-                        <Phone className="w-4 h-4 mr-1" />
-                        {contact.phone_mobile}
-                      </div>
-                      <div>
-                        <Badge variant={contact.current_contact_status === 'Active' ? 'default' : 'secondary'}>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <h3 className="font-semibold">
+                          {contact.first_name} {contact.last_name}
+                        </h3>
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          contact.current_contact_status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
                           {contact.current_contact_status}
-                        </Badge>
-                        <Badge variant="outline" className="ml-2">
-                          {contact.lifecycle_stage}
-                        </Badge>
+                        </span>
                       </div>
+                      <p className="text-sm text-gray-600">{contact.job_title || 'No title'}</p>
+                      {contact.company_name && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          <Building2 className="w-3 h-3 inline mr-1" />
+                          {contact.company_name}
+                        </p>
+                      )}
                     </div>
                   </div>
+
+                  {/* Center section - Account & Contact details in 3 columns */}
+                  <div className="flex-1 grid grid-cols-3 gap-x-6 gap-y-1 px-6">
+                    {/* Column 1: Account Business Info */}
+                    <div className="space-y-1">
+                      {contact.account?.customer_segment && (
+                        <div className="text-xs">
+                          <span className="text-gray-500">Segment:</span>
+                          <span className="ml-2 text-gray-900">{contact.account.customer_segment}</span>
+                        </div>
+                      )}
+                      {contact.account?.account_type && (
+                        <div className="text-xs">
+                          <span className="text-gray-500">Type:</span>
+                          <span className="ml-2 text-gray-900">{contact.account.account_type}</span>
+                        </div>
+                      )}
+                      {contact.lifecycle_stage && (
+                        <div className="text-xs">
+                          <span className="text-gray-500">Stage:</span>
+                          <span className="ml-2 text-gray-900">{contact.lifecycle_stage}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Column 2: Account Industry & Location */}
+                    <div className="space-y-1">
+                      {contact.account?.acct_industry && (
+                        <div className="text-xs">
+                          <span className="text-gray-500">Industry:</span>
+                          <span className="ml-2 text-gray-900">{contact.account.acct_industry}</span>
+                        </div>
+                      )}
+                      {contact.account?.acct_sub_industry && (
+                        <div className="text-xs">
+                          <span className="text-gray-500">Sub-Industry:</span>
+                          <span className="ml-2 text-gray-900">{contact.account.acct_sub_industry}</span>
+                        </div>
+                      )}
+                      {(contact.account?.billing_city || contact.account?.billing_state || contact.account?.billing_country) && (
+                        <div className="text-xs">
+                          <span className="text-gray-500">Location:</span>
+                          <span className="ml-2 text-gray-900">
+                            {[contact.account.billing_city, contact.account.billing_state, contact.account.billing_country].filter(Boolean).join(', ')}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Column 3: Contact Information */}
+                    <div className="space-y-1">
+                      {contact.email_primary && (
+                        <div className="text-xs flex items-center">
+                          <Mail className="w-3 h-3 mr-1 text-gray-500" />
+                          <span className="text-gray-900">{contact.email_primary}</span>
+                        </div>
+                      )}
+                      {contact.phone_mobile && (
+                        <div className="text-xs flex items-center">
+                          <Phone className="w-3 h-3 mr-1 text-gray-500" />
+                          <span className="text-gray-900">{contact.phone_mobile}</span>
+                        </div>
+                      )}
+                      {contact.account?.website && (
+                        <div className="text-xs flex items-center">
+                          <Building2 className="w-3 h-3 mr-1 text-gray-500" />
+                          <span className="text-blue-600">{contact.account.website}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right section - Actions */}
                   <div className="flex items-center space-x-2">
                     <Button
                       variant="outline"
