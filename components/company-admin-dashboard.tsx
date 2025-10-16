@@ -11,12 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { 
-  Plus, Users, Shield, Edit, Trash2, Mail, User, 
+import {
+  Plus, Users, Shield, Edit, Trash2, Mail, User,
   CheckCircle, XCircle, Building2, Settings, UserPlus, Crown,
-  Upload, Globe, Phone, MapPin, Calendar, Hash, Clock, Palette, Save, X, Eye, EyeOff, AlertTriangle
+  Upload, Globe, Phone, MapPin, Calendar, Hash, Clock, Palette, Save, X, Eye, EyeOff, AlertTriangle, Sliders
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { AccountFieldsManager } from "./account-fields-manager"
 
 interface User {
   id: string
@@ -520,7 +521,7 @@ export function CompanyAdminDashboard() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-3xl grid-cols-3">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
             Users
@@ -528,6 +529,10 @@ export function CompanyAdminDashboard() {
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
             Company Settings
+          </TabsTrigger>
+          <TabsTrigger value="fields" className="flex items-center gap-2">
+            <Sliders className="w-4 h-4" />
+            Optional Fields Selection
           </TabsTrigger>
         </TabsList>
 
@@ -941,6 +946,98 @@ export function CompanyAdminDashboard() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Optional Fields Selection Tab */}
+        <TabsContent value="fields" className="space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold mb-2">Optional Fields Configuration</h2>
+            <p className="text-gray-600">Configure which fields appear in different modules for data entry</p>
+          </div>
+
+          {/* Nested tabs for different modules */}
+          <Tabs defaultValue="accounts" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="accounts">Accounts Fields</TabsTrigger>
+              <TabsTrigger value="contacts">
+                Contacts Fields
+              </TabsTrigger>
+              <TabsTrigger value="products" disabled>
+                Products Fields <Badge variant="outline" className="ml-2">Coming Soon</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="deals" disabled>
+                Deals Fields <Badge variant="outline" className="ml-2">Coming Soon</Badge>
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Accounts Fields Tab */}
+            <TabsContent value="accounts">
+              <AccountFieldsManager />
+            </TabsContent>
+
+            {/* Contacts Fields Tab */}
+            <TabsContent value="contacts">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Contacts Fields Configuration</CardTitle>
+                  <CardDescription>
+                    Manage and configure the contact fields for your organization.
+                    Run the SQL script <code className="bg-gray-100 px-2 py-1 rounded">CONTACTS_SETUP_DROP_AND_CREATE.sql</code> in Supabase first to create the contacts table and field configurations.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-12">
+                    <Users className="w-16 h-16 mx-auto text-blue-400 mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Setup Required</h3>
+                    <p className="text-gray-600 mb-4">
+                      Please execute the <strong>CONTACTS_SETUP_DROP_AND_CREATE.sql</strong> script in your Supabase dashboard to enable contacts field management.
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      The Contact Fields Manager will be available after the database setup is complete.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Products Fields Tab - Placeholder */}
+            <TabsContent value="products">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Products Fields Configuration</CardTitle>
+                  <CardDescription>Configure optional fields for products module</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-12">
+                    <Building2 className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Coming Soon</h3>
+                    <p className="text-gray-600">
+                      Products field configuration will be available in the next update
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Deals Fields Tab - Placeholder */}
+            <TabsContent value="deals">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Deals Fields Configuration</CardTitle>
+                  <CardDescription>Configure optional fields for deals module</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-12">
+                    <Shield className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Coming Soon</h3>
+                    <p className="text-gray-600">
+                      Deals field configuration will be available in the next update
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
 
