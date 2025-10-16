@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { AccountFieldsManager } from "./account-fields-manager"
+import { ContactFieldsManager } from "./contact-fields-manager"
 
 interface User {
   id: string
@@ -977,27 +978,7 @@ export function CompanyAdminDashboard() {
 
             {/* Contacts Fields Tab */}
             <TabsContent value="contacts">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Contacts Fields Configuration</CardTitle>
-                  <CardDescription>
-                    Manage and configure the contact fields for your organization.
-                    Run the SQL script <code className="bg-gray-100 px-2 py-1 rounded">CONTACTS_SETUP_DROP_AND_CREATE.sql</code> in Supabase first to create the contacts table and field configurations.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-12">
-                    <Users className="w-16 h-16 mx-auto text-blue-400 mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Setup Required</h3>
-                    <p className="text-gray-600 mb-4">
-                      Please execute the <strong>CONTACTS_SETUP_DROP_AND_CREATE.sql</strong> script in your Supabase dashboard to enable contacts field management.
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      The Contact Fields Manager will be available after the database setup is complete.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+              <ContactFieldsManager />
             </TabsContent>
 
             {/* Products Fields Tab - Placeholder */}
