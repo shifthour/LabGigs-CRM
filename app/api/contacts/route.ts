@@ -15,14 +15,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
 
-    // Fetch contacts with owner and account information
+    // Fetch contacts - without joins for now since foreign keys aren't set up
     let query = supabase
       .from('contacts')
-      .select(`
-        *,
-        owner:users!contacts_owner_id_fkey(id, full_name, email),
-        account:accounts!contacts_account_id_fkey(id, account_name)
-      `, { count: 'exact' })
+      .select('*', { count: 'exact' })
       .eq('company_id', companyId)
       .order('created_at', { ascending: false })
 
