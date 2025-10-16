@@ -46,6 +46,7 @@ interface Account {
   accountType?: string
   accountIndustry?: string
   subIndustry?: string
+  primaryContactName?: string
 }
 
 const industries = ["All", "Biotech Company", "Dealer", "Educational Institutions", "Food and Beverages", "Hair Transplant Clinics/ Hospitals", "Molecular Diagnostics", "Pharmaceutical", "Research", "SRO", "Training Institute", "Universities"]
@@ -152,7 +153,8 @@ export function AccountsContent() {
           customerSegment: account.customer_segment || account.acct_customer_segment,
           accountType: account.account_type,
           accountIndustry: account.acct_industry,
-          subIndustry: account.acct_sub_industry
+          subIndustry: account.acct_sub_industry,
+          primaryContactName: account.primary_contact_name || account.contact_name || ''
         }
       })
       
@@ -899,6 +901,12 @@ export function AccountsContent() {
 
                       {/* Column 3: Contact Information */}
                       <div className="space-y-1">
+                        {account.primaryContactName && (
+                          <div className="text-xs">
+                            <span className="text-gray-500">Contact:</span>
+                            <span className="ml-2 text-gray-900 font-medium">{account.primaryContactName}</span>
+                          </div>
+                        )}
                         {account.contactNo && (
                           <div className="text-xs flex items-center">
                             <Phone className="w-3 h-3 mr-1 text-gray-500" />
