@@ -19,6 +19,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { AccountFieldsManager } from "./account-fields-manager"
 import { ContactFieldsManager } from "./contact-fields-manager"
+import { ProductFieldsManager } from "./product-fields-manager"
 
 interface User {
   id: string
@@ -963,8 +964,8 @@ export function CompanyAdminDashboard() {
               <TabsTrigger value="contacts">
                 Contacts Fields
               </TabsTrigger>
-              <TabsTrigger value="products" disabled>
-                Products Fields <Badge variant="outline" className="ml-2">Coming Soon</Badge>
+              <TabsTrigger value="products">
+                Products Fields
               </TabsTrigger>
               <TabsTrigger value="deals" disabled>
                 Deals Fields <Badge variant="outline" className="ml-2">Coming Soon</Badge>
@@ -981,23 +982,9 @@ export function CompanyAdminDashboard() {
               <ContactFieldsManager />
             </TabsContent>
 
-            {/* Products Fields Tab - Placeholder */}
+            {/* Products Fields Tab */}
             <TabsContent value="products">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Products Fields Configuration</CardTitle>
-                  <CardDescription>Configure optional fields for products module</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-12">
-                    <Building2 className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Coming Soon</h3>
-                    <p className="text-gray-600">
-                      Products field configuration will be available in the next update
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+              <ProductFieldsManager />
             </TabsContent>
 
             {/* Deals Fields Tab - Placeholder */}
