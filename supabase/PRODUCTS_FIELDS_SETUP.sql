@@ -76,8 +76,8 @@ BEGIN
             'Enter product code or SKU', 'Internal product code or SKU'),
         (company_record.id, 'product_description', 'Product Description', 'textarea', true, true, 'basic_info', 3,
             'Enter detailed product description', 'Detailed product description'),
-        (company_record.id, 'product_category_id', 'Product Category', 'select', true, true, 'basic_info', 4,
-            'Select category', 'Primary product category classification'),
+        (company_record.id, 'product_category_id', 'Product Category ID', 'text', true, true, 'basic_info', 4,
+            'Enter product category ID', 'Primary product category classification'),
         (company_record.id, 'base_price', 'Base Price', 'number', true, true, 'pricing', 5,
             'Enter base price', 'Base price before any discounts or classifications'),
         (company_record.id, 'currency', 'Currency', 'select', true, true, 'pricing', 6,
@@ -88,8 +88,8 @@ BEGIN
             'Enter technical specifications', 'Detailed technical specifications and features'),
         (company_record.id, 'product_status', 'Product Status', 'select', true, true, 'basic_info', 9,
             'Select status', 'Current lifecycle status of the product'),
-        (company_record.id, 'data_sensitive_information', 'Data Sensitive Information', 'textarea', true, true, 'technical', 10,
-            'Enter data sensitivity details', 'Data sensitivity classification')
+        (company_record.id, 'data_classification', 'Data Classification', 'select', true, true, 'technical', 10,
+            'Select data classification', 'Data classification level')
         ON CONFLICT (company_id, field_name) DO NOTHING;
 
         -- Update field options for mandatory select fields
@@ -104,6 +104,10 @@ BEGIN
         UPDATE product_field_configurations
         SET field_options = ARRAY['Active', 'Inactive', 'Draft', 'Discontinued', 'Out of Stock']
         WHERE company_id = company_record.id AND field_name = 'product_status';
+
+        UPDATE product_field_configurations
+        SET field_options = ARRAY['Public', 'Internal', 'Confidential', 'Restricted']
+        WHERE company_id = company_record.id AND field_name = 'data_classification';
 
         -- ==========================================
         -- OPTIONAL FIELDS - All disabled by default

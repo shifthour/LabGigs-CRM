@@ -54,6 +54,11 @@ export function DynamicProductField({
       return ['Active', 'Inactive', 'Draft', 'Discontinued', 'Out of Stock']
     }
 
+    // Special handling for data_classification field
+    if (config.field_name === 'data_classification') {
+      return ['Public', 'Internal', 'Confidential', 'Restricted']
+    }
+
     // For regular select fields
     return config.field_options || []
   }
