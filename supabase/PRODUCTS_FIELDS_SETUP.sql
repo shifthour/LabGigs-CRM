@@ -32,20 +32,26 @@ CREATE INDEX IF NOT EXISTS idx_product_fields_section ON product_field_configura
 -- Step 2: Enable RLS
 ALTER TABLE product_field_configurations ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Users can view product field configs from their company" ON product_field_configurations;
+DROP POLICY IF EXISTS "Users can insert product field configs to their company" ON product_field_configurations;
+DROP POLICY IF EXISTS "Users can update product field configs from their company" ON product_field_configurations;
+DROP POLICY IF EXISTS "Users can delete product field configs from their company" ON product_field_configurations;
+
 -- Create RLS policies
-CREATE POLICY IF NOT EXISTS "Users can view product field configs from their company"
+CREATE POLICY "Users can view product field configs from their company"
   ON product_field_configurations FOR SELECT
   USING (true);
 
-CREATE POLICY IF NOT EXISTS "Users can insert product field configs to their company"
+CREATE POLICY "Users can insert product field configs to their company"
   ON product_field_configurations FOR INSERT
   WITH CHECK (true);
 
-CREATE POLICY IF NOT EXISTS "Users can update product field configs from their company"
+CREATE POLICY "Users can update product field configs from their company"
   ON product_field_configurations FOR UPDATE
   USING (true);
 
-CREATE POLICY IF NOT EXISTS "Users can delete product field configs from their company"
+CREATE POLICY "Users can delete product field configs from their company"
   ON product_field_configurations FOR DELETE
   USING (true);
 
