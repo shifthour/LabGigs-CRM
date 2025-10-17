@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Plus, Search, Download, Edit, Package, Upload, ChevronDown, ChevronUp, X, ShoppingCart, CheckCircle, Grid3X3, IndianRupee } from "lucide-react"
 // import { AIProductRecommendations } from "@/components/ai-product-recommendations"
-import { AddProductModal } from "@/components/add-product-modal"
 import { ProductsFileImport } from "@/components/products-file-import"
 import { useToast } from "@/hooks/use-toast"
 
@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast"
 const statuses = ["All", "Active", "Inactive"]
 
 export function ProductsContent() {
+  const router = useRouter()
   const { toast } = useToast()
   const [productsList, setProductsList] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -34,9 +35,7 @@ export function ProductsContent() {
   const [selectedStatus, setSelectedStatus] = useState("All")
   const [availablePrincipals, setAvailablePrincipals] = useState<string[]>(["All"])
   const [availableCategories, setAvailableCategories] = useState<string[]>(["All"])
-  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false)
   const [isDataImportModalOpen, setIsDataImportModalOpen] = useState(false)
-  const [editingProduct, setEditingProduct] = useState<any>(null)
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<number>>(new Set())
   const [isImporting, setIsImporting] = useState(false)
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 })
@@ -140,60 +139,6 @@ export function ProductsContent() {
       .filter(category => category && category.trim() !== ''))]
       .sort()
     setAvailableCategories(["All", ...categories])
-  }
-  
-  const handleSaveProduct = async (productData: any) => {
-    try {
-      const companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
-      
-      // Check if we're editing an existing product
-      const isEditing = editingProduct && editingProduct.id
-      const method = isEditing ? 'PUT' : 'POST'
-      const url = '/api/products'
-      
-      const requestBody = isEditing 
-        ? {
-            id: editingProduct.id,
-            ...productData,
-            companyId
-          }
-        : {
-            ...productData,
-            companyId
-          }
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      })
-      
-      if (!response.ok) {
-        throw new Error(`Failed to ${isEditing ? 'update' : 'create'} product`)
-      }
-      
-      const savedProduct = await response.json()
-      
-      toast({
-        title: isEditing ? "Product updated" : "Product created",
-        description: `Product ${productData.product_name} has been successfully ${isEditing ? 'updated' : 'created'}.`
-      })
-      
-      setIsAddProductModalOpen(false)
-      setEditingProduct(null)
-      
-      // Reload products to show the changes
-      await loadProducts()
-    } catch (error) {
-      console.error(`Error ${editingProduct ? 'updating' : 'creating'} product:`, error)
-      toast({
-        title: "Error",
-        description: `Failed to ${editingProduct ? 'update' : 'create'} product. Please try again.`,
-        variant: "destructive"
-      })
-    }
   }
   
   const handleImportData = async (data: any[]) => {
@@ -413,9 +358,12 @@ export function ProductsContent() {
     }
   }
 
+  const handleAddProduct = () => {
+    router.push('/products/add')
+  }
+
   const handleEditProduct = (product: any) => {
-    setEditingProduct(product)
-    setIsAddProductModalOpen(true)
+    router.push(`/products/edit/${product.id}`)
   }
 
   const toggleDescription = (productId: number) => {
@@ -487,7 +435,7 @@ export function ProductsContent() {
             <Upload className="w-4 h-4 mr-2" />
             Import Products
           </Button>
-          <Button onClick={() => setIsAddProductModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+          <Button onClick={handleAddProduct} className="bg-blue-600 hover:bg-blue-700">
             <Plus className="w-4 h-4 mr-2" />
             Add Product
           </Button>
@@ -788,17 +736,6 @@ export function ProductsContent() {
         context="cross-sell"
       /> */}
 
-      {/* AddProductModal component */}
-      <AddProductModal 
-        isOpen={isAddProductModalOpen} 
-        onClose={() => {
-          setIsAddProductModalOpen(false)
-          setEditingProduct(null)
-        }} 
-        onSave={handleSaveProduct} 
-        editingProduct={editingProduct}
-      />
-      
       {/* ProductsFileImport component */}
       <ProductsFileImport 
         isOpen={isDataImportModalOpen} 
