@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast"
 import { AccountFieldsManager } from "./account-fields-manager"
 import { ContactFieldsManager } from "./contact-fields-manager"
 import { ProductFieldsManager } from "./product-fields-manager"
+import { LeadFieldsManager } from "./lead-fields-manager"
 
 interface User {
   id: string
@@ -967,6 +968,9 @@ export function CompanyAdminDashboard() {
               <TabsTrigger value="products">
                 Products Fields
               </TabsTrigger>
+              <TabsTrigger value="leads">
+                Leads Fields
+              </TabsTrigger>
               <TabsTrigger value="deals" disabled>
                 Deals Fields <Badge variant="outline" className="ml-2">Coming Soon</Badge>
               </TabsTrigger>
@@ -985,6 +989,11 @@ export function CompanyAdminDashboard() {
             {/* Products Fields Tab */}
             <TabsContent value="products">
               <ProductFieldsManager />
+            </TabsContent>
+
+            {/* Leads Fields Tab */}
+            <TabsContent value="leads">
+              <LeadFieldsManager />
             </TabsContent>
 
             {/* Deals Fields Tab - Placeholder */}

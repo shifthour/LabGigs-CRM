@@ -423,11 +423,11 @@ export function LeadsContent() {
   }
 
   const handleEditLead = (lead: any) => {
-    console.log('=== EDIT LEAD CLICKED ===')
-    console.log('Lead data being passed to edit modal:', lead)
-    console.log('Lead products:', lead.leadProducts)
-    setEditingLead(lead)
-    setIsAddLeadModalOpen(true) // Use the new simplified modal for editing
+    router.push(`/leads/edit/${lead.id}`)
+  }
+
+  const handleAddLead = () => {
+    router.push('/leads/add')
   }
 
   const handleSaveLead = async (leadData: any) => {
@@ -775,7 +775,7 @@ export function LeadsContent() {
             <Upload className="w-4 h-4 mr-2" />
             Import Data
           </Button>
-          <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setIsAddLeadModalOpen(true)}>
+          <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleAddLead}>
             <Plus className="w-4 h-4 mr-2" />
             Add Lead
           </Button>
