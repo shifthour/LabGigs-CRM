@@ -47,16 +47,23 @@ export async function PUT(request: NextRequest) {
 
     // Update each field configuration
     const updates = fieldConfigs.map(async (config) => {
+      const updateData: any = {
+        is_enabled: config.is_enabled,
+        display_order: config.display_order,
+        field_label: config.field_label,
+        placeholder: config.placeholder,
+        help_text: config.help_text,
+        updated_at: new Date().toISOString()
+      }
+
+      // Include is_mandatory if provided
+      if (config.is_mandatory !== undefined) {
+        updateData.is_mandatory = config.is_mandatory
+      }
+
       const { data, error } = await supabase
         .from('lead_field_configurations')
-        .update({
-          is_enabled: config.is_enabled,
-          display_order: config.display_order,
-          field_label: config.field_label,
-          placeholder: config.placeholder,
-          help_text: config.help_text,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('company_id', companyId)
         .eq('field_name', config.field_name)
         .select()

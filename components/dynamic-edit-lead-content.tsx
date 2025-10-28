@@ -138,15 +138,71 @@ export function DynamicEditLeadContent({ leadId }: DynamicEditLeadContentProps) 
   // Update form data when lead data is loaded
   useEffect(() => {
     if (leadData && fieldConfigs.length > 0) {
-      const initialData: Record<string, any> = {}
-      fieldConfigs
-        .filter(f => f.is_enabled && f.field_name !== 'lead_id')
-        .forEach(field => {
-          initialData[field.field_name] = leadData[field.field_name] || ''
-        })
-      setFormData(initialData)
+      const initializeFormData = async () => {
+        const initialData: Record<string, any> = {}
+
+        // First, populate all basic fields from lead data
+        fieldConfigs
+          .filter(f => f.is_enabled && f.field_name !== 'lead_id')
+          .forEach(field => {
+            initialData[field.field_name] = leadData[field.field_name] || ''
+          })
+
+        // Ensure account_id and contact are properly set from lead data
+        const accountId = leadData.account_id || leadData.account
+        const contactId = leadData.contact_id || leadData.contact
+
+        if (accountId) {
+          initialData.account_id = accountId
+          initialData.account = accountId
+        }
+
+        if (contactId) {
+          initialData.contact_id = contactId
+          initialData.contact = contactId
+        }
+
+        // If there's a contact_id, fetch contact details to populate contact-related fields
+        if (contactId) {
+          try {
+            const companyId = currentUser?.company_id
+            const response = await fetch(`/api/contacts?companyId=${companyId}`)
+            if (response.ok) {
+              const contactsData = await response.json()
+              const contacts = contactsData.contacts || contactsData || []
+              const contact = contacts.find((c: any) => c.id === contactId)
+
+              if (contact) {
+                // Populate contact fields if they exist in field configs
+                if (fieldConfigs.some(f => f.field_name === 'first_name' && f.is_enabled)) {
+                  initialData.first_name = contact.first_name || leadData.first_name || ''
+                }
+                if (fieldConfigs.some(f => f.field_name === 'last_name' && f.is_enabled)) {
+                  initialData.last_name = contact.last_name || leadData.last_name || ''
+                }
+                if (fieldConfigs.some(f => f.field_name === 'phone_number' && f.is_enabled)) {
+                  initialData.phone_number = contact.phone_mobile || contact.phone_work || leadData.phone_number || leadData.phone || ''
+                }
+                if (fieldConfigs.some(f => f.field_name === 'email_address' && f.is_enabled)) {
+                  initialData.email_address = contact.email_primary || leadData.email_address || leadData.email || ''
+                }
+                if (fieldConfigs.some(f => f.field_name === 'department' && f.is_enabled)) {
+                  initialData.department = contact.department || leadData.department || ''
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching contact details:', error)
+          }
+        }
+
+        console.log('Initialized form data:', initialData)
+        setFormData(initialData)
+      }
+
+      initializeFormData()
     }
-  }, [leadData, fieldConfigs])
+  }, [leadData, fieldConfigs, currentUser])
 
   const handleFieldChange = (fieldName: string, value: any) => {
     setFormData(prev => ({
@@ -161,6 +217,56 @@ export function DynamicEditLeadContent({ leadId }: DynamicEditLeadContentProps) 
         return newErrors
       })
     }
+  }
+
+  const handleAccountSelect = (accountData: any) => {
+    // Auto-populate account-related fields if they exist
+    setFormData(prev => ({
+      ...prev,
+      account_id: accountData.id
+    }))
+  }
+
+  const handleContactSelect = (contactData: any) => {
+    // Auto-populate contact-related fields
+    setFormData(prev => {
+      const updates: Record<string, any> = {}
+
+      // Populate first_name if field exists
+      if (contactData.first_name && fieldConfigs.some(f => f.field_name === 'first_name' && f.is_enabled)) {
+        updates.first_name = contactData.first_name
+      }
+
+      // Populate last_name if field exists
+      if (contactData.last_name && fieldConfigs.some(f => f.field_name === 'last_name' && f.is_enabled)) {
+        updates.last_name = contactData.last_name
+      }
+
+      // Populate phone_number if field exists
+      if (contactData.phone_number && fieldConfigs.some(f => f.field_name === 'phone_number' && f.is_enabled)) {
+        updates.phone_number = contactData.phone_number
+      }
+
+      // Populate email_address if field exists
+      if (contactData.email && fieldConfigs.some(f => f.field_name === 'email_address' && f.is_enabled)) {
+        updates.email_address = contactData.email
+      }
+
+      return {
+        ...prev,
+        ...updates
+      }
+    })
+
+    // Clear errors for auto-populated fields
+    setErrors(prev => {
+      const newErrors = { ...prev }
+      delete newErrors.first_name
+      delete newErrors.last_name
+      delete newErrors.phone_number
+      delete newErrors.email_address
+      return newErrors
+    })
   }
 
   const validateForm = () => {
@@ -453,6 +559,8 @@ export function DynamicEditLeadContent({ leadId }: DynamicEditLeadContentProps) 
                             onChange={handleFieldChange}
                             error={errors[field.field_name]}
                             dependentValues={formData}
+                            onAccountSelect={handleAccountSelect}
+                            onContactSelect={handleContactSelect}
                           />
                         </div>
                       ))}

@@ -19,40 +19,79 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 })
     }
 
-    return NextResponse.json(leads)
+    // Merge custom_fields back into the main lead object
+    const leadsWithCustomFields = leads?.map(lead => {
+      if (lead.custom_fields && typeof lead.custom_fields === 'object') {
+        const { custom_fields, ...restLead } = lead
+        return { ...restLead, ...custom_fields }
+      }
+      return lead
+    })
+
+    return NextResponse.json(leadsWithCustomFields)
   } catch (error) {
     console.error('Error in leads GET:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
+// Define standard fields that exist in the leads table schema
+// Based on complete_leads_table_setup.sql
+const STANDARD_LEAD_FIELDS = [
+  'account_id', 'account_name', 'contact_id', 'contact_name', 'department',
+  'phone', 'email', 'whatsapp', 'lead_source', 'product_id', 'product_name',
+  'lead_status', 'priority', 'assigned_to', 'lead_date', 'closing_date',
+  'budget', 'quantity', 'price_per_unit', 'location', 'city', 'state',
+  'country', 'address', 'buyer_ref', 'expected_closing_date',
+  'next_followup_date', 'notes'
+  // Note: All other fields like job_title, consent_status, lead_stage, etc.
+  // will be stored in the custom_fields JSONB column
+]
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { companyId, selected_products, ...leadData } = body
+    const { companyId, userId, selected_products, ...leadData } = body
 
     if (!companyId) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
 
-    // Prepare lead data for insertion (excluding product-specific fields that will be in junction table)
-    const leadToInsert = {
-      ...leadData,
+    // Separate standard fields from custom fields
+    const standardFields: any = {}
+    const customFields: any = {}
+
+    Object.keys(leadData).forEach(key => {
+      if (STANDARD_LEAD_FIELDS.includes(key)) {
+        standardFields[key] = leadData[key]
+      } else {
+        // Store non-standard fields in custom_fields
+        customFields[key] = leadData[key]
+      }
+    })
+
+    // Prepare lead data for insertion
+    const leadToInsert: any = {
+      ...standardFields,
       company_id: companyId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }
 
-    // Remove selected_products from the main lead data and any undefined/null fields
+    // Add custom_fields if there are any
+    if (Object.keys(customFields).length > 0) {
+      leadToInsert.custom_fields = customFields
+    }
+
+    // Remove unwanted fields and any undefined/null fields from standard fields
     Object.keys(leadToInsert).forEach(key => {
-      if (leadToInsert[key] === undefined || leadToInsert[key] === '' || key === 'selected_products') {
-        if (key === 'selected_products') {
-          delete leadToInsert[key]
-        } else {
-          leadToInsert[key] = null
-        }
+      if (key !== 'custom_fields' && (leadToInsert[key] === undefined || leadToInsert[key] === '')) {
+        leadToInsert[key] = null
       }
     })
+
+    console.log('Attempting to insert lead:', leadToInsert)
+    console.log('Custom fields:', customFields)
 
     const { data: newLead, error } = await supabase
       .from('leads')
@@ -62,7 +101,8 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating lead:', error)
-      return NextResponse.json({ error: 'Failed to create lead' }, { status: 500 })
+      console.error('Error details:', JSON.stringify(error, null, 2))
+      return NextResponse.json({ error: error.message || 'Failed to create lead' }, { status: 500 })
     }
 
     // Insert selected products into lead_products table
@@ -87,23 +127,28 @@ export async function POST(request: NextRequest) {
     }
 
     // Auto-create activity if next_followup_date is set
-    if (newLead.next_followup_date && newLead.contact_name) {
+    if (newLead.next_followup_date) {
       try {
+        // Build contact name from first_name and last_name if available
+        const contactName = newLead.first_name && newLead.last_name
+          ? `${newLead.first_name} ${newLead.last_name}`.trim()
+          : newLead.contact_name || 'Contact'
+
         await supabase.from('activities').insert({
           company_id: companyId,
-          user_id: leadData.assigned_to_user_id,
+          user_id: leadData.assigned_to_user_id || leadData.userId,
           activity_type: 'call',
-          title: `Follow up with ${newLead.contact_name}`,
-          description: `Follow up on ${newLead.product_name} inquiry from ${newLead.account_name}`,
+          title: `Follow up with ${contactName}`,
+          description: `Follow up on lead inquiry`,
           entity_type: 'lead',
           entity_id: newLead.id,
-          entity_name: newLead.account_name,
-          contact_name: newLead.contact_name,
-          contact_phone: newLead.phone,
-          contact_email: newLead.email,
+          entity_name: newLead.account || newLead.account_name || 'Lead',
+          contact_name: contactName,
+          contact_phone: newLead.phone_number || newLead.phone,
+          contact_email: newLead.email_address || newLead.email,
           scheduled_date: newLead.next_followup_date,
           due_date: newLead.next_followup_date,
-          priority: newLead.priority === 'High' ? 'high' : 'medium',
+          priority: (newLead.priority_level || newLead.priority) === 'High' ? 'high' : 'medium',
           assigned_to: newLead.assigned_to,
           status: 'pending'
         })
@@ -112,7 +157,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(newLead, { status: 201 })
+    // Merge custom_fields back into the response
+    let leadResponse = newLead
+    if (newLead.custom_fields && typeof newLead.custom_fields === 'object') {
+      const { custom_fields, ...restLead } = newLead
+      leadResponse = { ...restLead, ...custom_fields }
+    }
+
+    return NextResponse.json(leadResponse, { status: 201 })
   } catch (error) {
     console.error('Error in leads POST:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -128,20 +180,34 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Lead ID and Company ID are required' }, { status: 400 })
     }
 
-    // Prepare lead data for update (excluding product-specific fields)
-    const leadToUpdate = {
-      ...leadData,
+    // Separate standard fields from custom fields
+    const standardFields: any = {}
+    const customFields: any = {}
+
+    Object.keys(leadData).forEach(key => {
+      if (STANDARD_LEAD_FIELDS.includes(key)) {
+        standardFields[key] = leadData[key]
+      } else {
+        // Store non-standard fields in custom_fields
+        customFields[key] = leadData[key]
+      }
+    })
+
+    // Prepare lead data for update
+    const leadToUpdate: any = {
+      ...standardFields,
       updated_at: new Date().toISOString()
     }
 
-    // Remove selected_products and any undefined fields
+    // Add custom_fields if there are any
+    if (Object.keys(customFields).length > 0) {
+      leadToUpdate.custom_fields = customFields
+    }
+
+    // Remove any undefined fields from standard fields
     Object.keys(leadToUpdate).forEach(key => {
-      if (leadToUpdate[key] === undefined || leadToUpdate[key] === '' || key === 'selected_products') {
-        if (key === 'selected_products') {
-          delete leadToUpdate[key]
-        } else {
-          leadToUpdate[key] = null
-        }
+      if (key !== 'custom_fields' && (leadToUpdate[key] === undefined || leadToUpdate[key] === '')) {
+        leadToUpdate[key] = null
       }
     })
 
@@ -160,6 +226,13 @@ export async function PUT(request: NextRequest) {
 
     if (!updatedLead) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    }
+
+    // Merge custom_fields back into the response
+    let leadResponse = updatedLead
+    if (updatedLead.custom_fields && typeof updatedLead.custom_fields === 'object') {
+      const { custom_fields, ...restLead } = updatedLead
+      leadResponse = { ...restLead, ...custom_fields }
     }
 
     // Update selected products in lead_products table
@@ -216,7 +289,7 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(updatedLead)
+    return NextResponse.json(leadResponse)
   } catch (error) {
     console.error('Error in leads PUT:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

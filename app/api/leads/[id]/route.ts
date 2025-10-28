@@ -32,7 +32,14 @@ export async function GET(
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
     }
 
-    return NextResponse.json(lead)
+    // Merge custom_fields back into the main lead object
+    let leadResponse = lead
+    if (lead.custom_fields && typeof lead.custom_fields === 'object') {
+      const { custom_fields, ...restLead } = lead
+      leadResponse = { ...restLead, ...custom_fields }
+    }
+
+    return NextResponse.json(leadResponse)
   } catch (error) {
     console.error('Error in lead GET:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
