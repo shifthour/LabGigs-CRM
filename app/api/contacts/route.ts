@@ -10,17 +10,22 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const companyId = searchParams.get('companyId')
-
-    if (!companyId) {
-      return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
-    }
+    const accountId = searchParams.get('accountId')
 
     // Fetch contacts
     let query = supabase
       .from('contacts')
       .select('*', { count: 'exact' })
-      .eq('company_id', companyId)
       .order('created_at', { ascending: false })
+
+    // Apply filters
+    if (companyId) {
+      query = query.eq('company_id', companyId)
+    }
+
+    if (accountId) {
+      query = query.eq('account_id', accountId)
+    }
 
     const { data, error, count } = await query
 
@@ -89,6 +94,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Clean up contactData - convert empty strings to null
+    const cleanedContactData = { ...contactData }
+    Object.keys(cleanedContactData).forEach(key => {
+      if (cleanedContactData[key] === '' || cleanedContactData[key] === undefined) {
+        cleanedContactData[key] = null
+      }
+    })
+
     const { data, error } = await supabase
       .from('contacts')
       .insert({
@@ -97,7 +110,7 @@ export async function POST(request: NextRequest) {
         owner_id: userId || null,
         created_by: userId || null,
         company_name: companyName,
-        ...contactData
+        ...cleanedContactData
       })
       .select()
       .single()
@@ -137,12 +150,20 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // Clean up contactData - convert empty strings to null
+    const cleanedContactData = { ...contactData }
+    Object.keys(cleanedContactData).forEach(key => {
+      if (cleanedContactData[key] === '' || cleanedContactData[key] === undefined) {
+        cleanedContactData[key] = null
+      }
+    })
+
     const { data, error } = await supabase
       .from('contacts')
       .update({
         account_id: accountId || null,
         company_name: companyName,
-        ...contactData,
+        ...cleanedContactData,
         modified_date: new Date().toISOString()
       })
       .eq('id', id)

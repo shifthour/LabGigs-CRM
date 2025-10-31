@@ -92,19 +92,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Account name is required' }, { status: 400 })
     }
 
-    // Check for duplicate (same name AND city)
-    const { data: existing } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('company_id', companyId)
-      .eq('account_name', accountData.account_name)
-      .eq('billing_city', accountData.billing_city || '')
-      .single()
+    // Clean the account data - convert empty strings to null
+    const cleanedAccountData: any = {}
+    Object.keys(accountData).forEach(key => {
+      const value = accountData[key]
+      // Convert empty strings to null, keep other values as-is
+      if (value === '' || value === undefined) {
+        cleanedAccountData[key] = null
+      } else if (typeof value === 'string' && value.trim() === '') {
+        cleanedAccountData[key] = null
+      } else {
+        cleanedAccountData[key] = value
+      }
+    })
 
-    if (existing) {
-      return NextResponse.json({
-        error: `An account with name "${accountData.account_name}" already exists in ${accountData.billing_city || 'this city'}`
-      }, { status: 400 })
+    // Check for duplicate (same name AND city) - only if city is provided
+    if (cleanedAccountData.billing_city) {
+      const { data: existing } = await supabase
+        .from('accounts')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('account_name', cleanedAccountData.account_name)
+        .eq('billing_city', cleanedAccountData.billing_city)
+        .single()
+
+      if (existing) {
+        return NextResponse.json({
+          error: `An account with name "${cleanedAccountData.account_name}" already exists in ${cleanedAccountData.billing_city}`
+        }, { status: 400 })
+      }
     }
 
     // Create account with owner_id set to current user
@@ -114,21 +130,31 @@ export async function POST(request: NextRequest) {
         company_id: companyId,
         owner_id: userId || null,
         created_by: userId || null,
-        ...accountData
+        ...cleanedAccountData,
+        created_at: new Date().toISOString(),
+        modified_date: new Date().toISOString()
       })
       .select()
       .single()
-    
+
     if (error) {
       console.error('Error creating account:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('Error details:', JSON.stringify(error, null, 2))
+      return NextResponse.json({
+        error: error.message,
+        details: error.details || 'No additional details',
+        hint: error.hint || 'Check the data format and required fields'
+      }, { status: 500 })
     }
-    
+
     return NextResponse.json(data, { status: 201 })
-    
+
   } catch (error: any) {
     console.error('POST account error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({
+      error: error.message || 'Internal server error',
+      details: 'An unexpected error occurred while creating the account'
+    }, { status: 500 })
   }
 }
 
@@ -136,14 +162,31 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
     const { id, ...updates } = body
-    
+
     if (!id) {
       return NextResponse.json({ error: 'Account ID is required' }, { status: 400 })
     }
-    
+
+    // Clean the update data - convert empty strings to null
+    const cleanedUpdates: any = {}
+    Object.keys(updates).forEach(key => {
+      const value = updates[key]
+      // Convert empty strings to null, keep other values as-is
+      if (value === '' || value === undefined) {
+        cleanedUpdates[key] = null
+      } else if (typeof value === 'string' && value.trim() === '') {
+        cleanedUpdates[key] = null
+      } else {
+        cleanedUpdates[key] = value
+      }
+    })
+
+    // Add modified_date timestamp
+    cleanedUpdates.modified_date = new Date().toISOString()
+
     const { data, error } = await supabase
       .from('accounts')
-      .update(updates)
+      .update(cleanedUpdates)
       .eq('id', id)
       .select()
       .single()
