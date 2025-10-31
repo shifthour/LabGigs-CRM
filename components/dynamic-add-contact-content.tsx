@@ -213,19 +213,34 @@ export function DynamicAddContactContent() {
           router.push("/contacts")
         }
       } else {
-        const error = await response.json()
+        const errorData = await response.json()
+        console.error('Contact creation failed:', errorData)
+
+        // Build detailed error message
+        let errorMessage = errorData.error || 'Failed to create contact'
+        if (errorData.details) {
+          errorMessage += `\n\nDetails: ${errorData.details}`
+        }
+        if (errorData.hint) {
+          errorMessage += `\n\nSuggestion: ${errorData.hint}`
+        }
+
         toast({
-          title: "Error",
-          description: error.error || "Failed to create contact",
-          variant: "destructive"
+          title: `Error (${response.status})`,
+          description: errorMessage,
+          variant: "destructive",
+          duration: 10000,
         })
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating contact:', error)
+      const errorMessage = error.message || 'An unexpected error occurred while creating the contact. Please check the console for details.'
+
       toast({
         title: "Error",
-        description: "Failed to create contact",
-        variant: "destructive"
+        description: errorMessage,
+        variant: "destructive",
+        duration: 10000,
       })
     } finally {
       setSaving(false)

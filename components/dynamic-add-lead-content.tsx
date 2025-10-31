@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { DynamicLeadField } from "./dynamic-lead-field"
+import { MultiProductSelector } from "./multi-product-selector"
 
 interface FieldConfig {
   id: string
@@ -56,6 +57,7 @@ export function DynamicAddLeadContent() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const [selectedProducts, setSelectedProducts] = useState<any[]>([])
 
   useEffect(() => {
     const user = localStorage.getItem('user')
@@ -116,6 +118,68 @@ export function DynamicAddLeadContent() {
     }
   }
 
+  const handleAccountSelect = (accountData: any) => {
+    // Auto-populate account-related fields if they exist
+    setFormData(prev => ({
+      ...prev,
+      account_id: accountData.id
+    }))
+  }
+
+  const handleContactSelect = (contactData: any) => {
+    console.log('Contact selected:', contactData)
+
+    // Auto-populate contact-related fields
+    setFormData(prev => {
+      const updates: Record<string, any> = {}
+
+      // Populate first_name if field exists
+      if (contactData.first_name && fieldConfigs.some(f => f.field_name === 'first_name' && f.is_enabled)) {
+        updates.first_name = contactData.first_name
+      }
+
+      // Populate last_name if field exists
+      if (contactData.last_name && fieldConfigs.some(f => f.field_name === 'last_name' && f.is_enabled)) {
+        updates.last_name = contactData.last_name
+      }
+
+      // Populate phone_number if field exists - contacts table has phone_mobile
+      const phoneValue = contactData.phone_mobile || contactData.phone_number || contactData.phone
+      if (phoneValue && fieldConfigs.some(f => f.field_name === 'phone_number' && f.is_enabled)) {
+        updates.phone_number = phoneValue
+      }
+
+      // Populate email_address if field exists - contacts table has email_primary
+      const emailValue = contactData.email_primary || contactData.email || contactData.email_address
+      if (emailValue && fieldConfigs.some(f => f.field_name === 'email_address' && f.is_enabled)) {
+        updates.email_address = emailValue
+      }
+
+      // Populate department if field exists
+      if (contactData.department && fieldConfigs.some(f => f.field_name === 'department' && f.is_enabled)) {
+        updates.department = contactData.department
+      }
+
+      console.log('Auto-populating fields:', updates)
+
+      return {
+        ...prev,
+        ...updates
+      }
+    })
+
+    // Clear errors for auto-populated fields
+    setErrors(prev => {
+      const newErrors = { ...prev }
+      delete newErrors.first_name
+      delete newErrors.last_name
+      delete newErrors.phone_number
+      delete newErrors.email_address
+      delete newErrors.department
+      return newErrors
+    })
+  }
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
@@ -127,6 +191,18 @@ export function DynamicAddLeadContent() {
           newErrors[field.field_name] = `${field.field_label} is required`
         }
       })
+
+    // Validate products - at least one product is required
+    if (selectedProducts.length === 0) {
+      newErrors.products = 'At least one product is required'
+    } else {
+      // Validate each selected product
+      selectedProducts.forEach((product, index) => {
+        if (!product.product_id) {
+          newErrors.products = `Product #${index + 1} must have a product selected`
+        }
+      })
+    }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -167,7 +243,8 @@ export function DynamicAddLeadContent() {
         body: JSON.stringify({
           companyId: currentUser.company_id,
           userId: currentUser.id,
-          ...formData
+          ...formData,
+          selected_products: selectedProducts
         })
       })
 
@@ -192,19 +269,34 @@ export function DynamicAddLeadContent() {
           router.push("/leads")
         }
       } else {
-        const error = await response.json()
+        const errorData = await response.json()
+        console.error('Lead creation failed:', errorData)
+
+        // Build detailed error message
+        let errorMessage = errorData.error || 'Failed to create lead'
+        if (errorData.details) {
+          errorMessage += `\n\nDetails: ${errorData.details}`
+        }
+        if (errorData.hint) {
+          errorMessage += `\n\nSuggestion: ${errorData.hint}`
+        }
+
         toast({
-          title: "Error",
-          description: error.error || "Failed to create lead",
-          variant: "destructive"
+          title: `Error (${response.status})`,
+          description: errorMessage,
+          variant: "destructive",
+          duration: 10000,
         })
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating lead:', error)
+      const errorMessage = error.message || 'An unexpected error occurred while creating the lead. Please check the console for details.'
+
       toast({
         title: "Error",
-        description: "Failed to create lead",
-        variant: "destructive"
+        description: errorMessage,
+        variant: "destructive",
+        duration: 10000,
       })
     } finally {
       setSaving(false)
@@ -420,6 +512,8 @@ export function DynamicAddLeadContent() {
                             onChange={handleFieldChange}
                             error={errors[field.field_name]}
                             dependentValues={formData}
+                            onAccountSelect={handleAccountSelect}
+                            onContactSelect={handleContactSelect}
                           />
                         </div>
                       ))}
@@ -428,6 +522,24 @@ export function DynamicAddLeadContent() {
                 </Card>
               )
             })}
+
+            {/* Products Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Products</CardTitle>
+                <CardDescription>
+                  <span className="text-red-600">* At least one product is required</span>
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <MultiProductSelector
+                  value={selectedProducts}
+                  onChange={setSelectedProducts}
+                  error={errors.products}
+                  isMandatory={true}
+                />
+              </CardContent>
+            </Card>
           </div>
         </ScrollArea>
 

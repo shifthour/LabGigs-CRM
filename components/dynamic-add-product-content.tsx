@@ -199,19 +199,34 @@ export function DynamicAddProductContent() {
           router.push("/products")
         }
       } else {
-        const error = await response.json()
+        const errorData = await response.json()
+        console.error('Product creation failed:', errorData)
+
+        // Build detailed error message
+        let errorMessage = errorData.error || 'Failed to create product'
+        if (errorData.details) {
+          errorMessage += `\n\nDetails: ${errorData.details}`
+        }
+        if (errorData.hint) {
+          errorMessage += `\n\nSuggestion: ${errorData.hint}`
+        }
+
         toast({
-          title: "Error",
-          description: error.error || "Failed to create product",
-          variant: "destructive"
+          title: `Error (${response.status})`,
+          description: errorMessage,
+          variant: "destructive",
+          duration: 10000, // Show for 10 seconds so user can read
         })
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating product:', error)
+      const errorMessage = error.message || 'An unexpected error occurred while creating the product. Please check the console for details.'
+
       toast({
         title: "Error",
-        description: "Failed to create product",
-        variant: "destructive"
+        description: errorMessage,
+        variant: "destructive",
+        duration: 10000,
       })
     } finally {
       setSaving(false)

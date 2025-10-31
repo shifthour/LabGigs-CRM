@@ -463,82 +463,82 @@ export function AccountFieldsManager() {
                       {Object.keys(SECTION_LABELS)
                         .filter(section => selectedSectionFilter === 'all' || section === selectedSectionFilter)
                         .map(section => {
-                        const sectionFields = optionalFields.filter(f => f.field_section === section)
-                        if (sectionFields.length === 0) return null
+                          const sectionFields = optionalFields.filter(f => f.field_section === section)
+                          if (sectionFields.length === 0) return null
 
-                      return (
-                        <div key={section} className="mb-4">
-                          <button
-                            onClick={() => toggleSection(section)}
-                            className="w-full flex items-center justify-between p-3 bg-gray-100 hover:bg-gray-200 rounded-lg mb-2"
-                          >
-                            <div className="flex items-center space-x-2">
-                              <h3 className="font-semibold text-gray-900">{SECTION_LABELS[section]}</h3>
-                              <Badge variant="outline">{sectionFields.length} fields</Badge>
-                            </div>
-                            {expandedSections[section] ? (
-                              <ChevronUp className="w-5 h-5" />
-                            ) : (
-                              <ChevronDown className="w-5 h-5" />
-                            )}
-                          </button>
+                          return (
+                            <div key={section} className="mb-4">
+                              <button
+                                onClick={() => toggleSection(section)}
+                                className="w-full flex items-center justify-between p-3 bg-gray-100 hover:bg-gray-200 rounded-lg mb-2"
+                              >
+                                <div className="flex items-center space-x-2">
+                                  <h3 className="font-semibold text-gray-900">{SECTION_LABELS[section]}</h3>
+                                  <Badge variant="outline">{sectionFields.length} fields</Badge>
+                                </div>
+                                {expandedSections[section] ? (
+                                  <ChevronUp className="w-5 h-5" />
+                                ) : (
+                                  <ChevronDown className="w-5 h-5" />
+                                )}
+                              </button>
 
-                          {expandedSections[section] && (
-                            <div className="space-y-2 pl-2">
-                              {sectionFields
-                                .sort((a, b) => a.display_order - b.display_order)
-                                .map((field, index) => (
-                                <Card key={field.id} className={field.is_enabled ? 'border-blue-200' : 'border-gray-200 opacity-60'}>
-                                  <CardContent className="p-3">
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center space-x-3 flex-1">
-                                        <GripVertical className="w-4 h-4 text-gray-400" />
-                                        <div className="flex-1">
-                                          <div className="flex items-center space-x-2">
-                                            <h4 className="font-medium text-gray-900">{field.field_label}</h4>
-                                            <span className="text-xs text-gray-500 font-mono">{field.field_type}</span>
+                              {expandedSections[section] && (
+                                <div className="space-y-2 pl-2">
+                                  {sectionFields
+                                    .sort((a, b) => a.display_order - b.display_order)
+                                    .map((field, index) => (
+                                    <Card key={field.id} className={field.is_enabled ? 'border-blue-200' : 'border-gray-200 opacity-60'}>
+                                      <CardContent className="p-3">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center space-x-3 flex-1">
+                                            <GripVertical className="w-4 h-4 text-gray-400" />
+                                            <div className="flex-1">
+                                              <div className="flex items-center space-x-2">
+                                                <h4 className="font-medium text-gray-900">{field.field_label}</h4>
+                                                <span className="text-xs text-gray-500 font-mono">{field.field_type}</span>
+                                              </div>
+                                              {field.placeholder && (
+                                                <p className="text-xs text-gray-500">Placeholder: {field.placeholder}</p>
+                                              )}
+                                            </div>
                                           </div>
-                                          {field.placeholder && (
-                                            <p className="text-xs text-gray-500">Placeholder: {field.placeholder}</p>
-                                          )}
+                                          <div className="flex items-center space-x-2">
+                                            <div className="flex flex-col space-y-1">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleReorder(field.field_name, 'up')}
+                                                disabled={index === 0}
+                                                className="h-6 w-6 p-0"
+                                              >
+                                                <ChevronUp className="w-4 h-4" />
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleReorder(field.field_name, 'down')}
+                                                disabled={index === sectionFields.length - 1}
+                                                className="h-6 w-6 p-0"
+                                              >
+                                                <ChevronDown className="w-4 h-4" />
+                                              </Button>
+                                            </div>
+                                            <Switch
+                                              checked={field.is_enabled}
+                                              onCheckedChange={() => handleToggleField(field.field_name)}
+                                            />
+                                          </div>
                                         </div>
-                                      </div>
-                                      <div className="flex items-center space-x-2">
-                                        <div className="flex flex-col space-y-1">
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleReorder(field.field_name, 'up')}
-                                            disabled={index === 0}
-                                            className="h-6 w-6 p-0"
-                                          >
-                                            <ChevronUp className="w-4 h-4" />
-                                          </Button>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleReorder(field.field_name, 'down')}
-                                            disabled={index === sectionFields.length - 1}
-                                            className="h-6 w-6 p-0"
-                                          >
-                                            <ChevronDown className="w-4 h-4" />
-                                          </Button>
-                                        </div>
-                                        <Switch
-                                          checked={field.is_enabled}
-                                          onCheckedChange={() => handleToggleField(field.field_name)}
-                                        />
-                                      </div>
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              ))}
+                                      </CardContent>
+                                    </Card>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </ScrollArea>
+                          )
+                        })}
+                    </ScrollArea>
                   )}
                 </CardContent>
               </Card>

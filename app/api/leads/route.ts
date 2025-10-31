@@ -57,38 +57,57 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
 
+    // Fetch enabled field configurations for this company
+    const { data: fieldConfigs, error: configError } = await supabase
+      .from('lead_field_configurations')
+      .select('field_name, is_enabled')
+      .eq('company_id', companyId)
+      .eq('is_enabled', true)
+
+    if (configError) {
+      console.error('Error fetching field configurations:', configError)
+      return NextResponse.json({
+        error: 'Failed to load field configurations',
+        details: configError.message
+      }, { status: 500 })
+    }
+
+    // Get list of enabled field names
+    const enabledFieldNames = new Set(
+      (fieldConfigs || []).map(config => config.field_name)
+    )
+
     // Separate standard fields from custom fields
+    // Only include fields that are enabled in the configuration
     const standardFields: any = {}
     const customFields: any = {}
 
     Object.keys(leadData).forEach(key => {
-      if (STANDARD_LEAD_FIELDS.includes(key)) {
-        standardFields[key] = leadData[key]
-      } else {
-        // Store non-standard fields in custom_fields
-        customFields[key] = leadData[key]
+      // Only process fields that are enabled
+      if (enabledFieldNames.has(key)) {
+        const value = leadData[key]
+        const cleanedValue = (value === '' || value === undefined) ? null :
+                           (typeof value === 'string' && value.trim() === '') ? null : value
+
+        if (STANDARD_LEAD_FIELDS.includes(key)) {
+          standardFields[key] = cleanedValue
+        } else {
+          // Store non-standard fields in custom_fields
+          customFields[key] = cleanedValue
+        }
       }
     })
 
-    // Prepare lead data for insertion
+    // Build insert data with only enabled fields
     const leadToInsert: any = {
-      ...standardFields,
       company_id: companyId,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      ...standardFields
     }
 
     // Add custom_fields if there are any
     if (Object.keys(customFields).length > 0) {
       leadToInsert.custom_fields = customFields
     }
-
-    // Remove unwanted fields and any undefined/null fields from standard fields
-    Object.keys(leadToInsert).forEach(key => {
-      if (key !== 'custom_fields' && (leadToInsert[key] === undefined || leadToInsert[key] === '')) {
-        leadToInsert[key] = null
-      }
-    })
 
     console.log('Attempting to insert lead:', leadToInsert)
     console.log('Custom fields:', customFields)
@@ -102,7 +121,13 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Error creating lead:', error)
       console.error('Error details:', JSON.stringify(error, null, 2))
-      return NextResponse.json({ error: error.message || 'Failed to create lead' }, { status: 500 })
+
+      return NextResponse.json({
+        error: error.message || 'Failed to create lead',
+        details: error.details || `Error code: ${error.code || 'UNKNOWN'}`,
+        hint: error.hint || 'Check the lead field configuration to ensure all fields are properly set up',
+        code: error.code
+      }, { status: 500 })
     }
 
     // Insert selected products into lead_products table
@@ -180,36 +205,50 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Lead ID and Company ID are required' }, { status: 400 })
     }
 
+    // Fetch enabled field configurations for this company
+    const { data: fieldConfigs, error: configError } = await supabase
+      .from('lead_field_configurations')
+      .select('field_name, is_enabled')
+      .eq('company_id', companyId)
+      .eq('is_enabled', true)
+
+    let enabledFieldNames: Set<string> | null = null
+    if (!configError && fieldConfigs) {
+      enabledFieldNames = new Set(
+        fieldConfigs.map(config => config.field_name)
+      )
+    }
+
     // Separate standard fields from custom fields
+    // Only include fields that are enabled in the configuration
     const standardFields: any = {}
     const customFields: any = {}
 
     Object.keys(leadData).forEach(key => {
-      if (STANDARD_LEAD_FIELDS.includes(key)) {
-        standardFields[key] = leadData[key]
-      } else {
-        // Store non-standard fields in custom_fields
-        customFields[key] = leadData[key]
+      // If we have field configurations, only process enabled fields
+      if (!enabledFieldNames || enabledFieldNames.has(key)) {
+        const value = leadData[key]
+        const cleanedValue = (value === '' || value === undefined) ? null :
+                           (typeof value === 'string' && value.trim() === '') ? null : value
+
+        if (STANDARD_LEAD_FIELDS.includes(key)) {
+          standardFields[key] = cleanedValue
+        } else {
+          // Store non-standard fields in custom_fields
+          customFields[key] = cleanedValue
+        }
       }
     })
 
-    // Prepare lead data for update
+    // Build update data
     const leadToUpdate: any = {
-      ...standardFields,
-      updated_at: new Date().toISOString()
+      ...standardFields
     }
 
     // Add custom_fields if there are any
     if (Object.keys(customFields).length > 0) {
       leadToUpdate.custom_fields = customFields
     }
-
-    // Remove any undefined fields from standard fields
-    Object.keys(leadToUpdate).forEach(key => {
-      if (key !== 'custom_fields' && (leadToUpdate[key] === undefined || leadToUpdate[key] === '')) {
-        leadToUpdate[key] = null
-      }
-    })
 
     const { data: updatedLead, error } = await supabase
       .from('leads')
@@ -221,7 +260,15 @@ export async function PUT(request: NextRequest) {
 
     if (error) {
       console.error('Error updating lead:', error)
-      return NextResponse.json({ error: 'Failed to update lead' }, { status: 500 })
+      console.error('Error details:', JSON.stringify(error, null, 2))
+      console.error('Update data:', JSON.stringify(leadToUpdate, null, 2))
+
+      return NextResponse.json({
+        error: error.message || 'Failed to update lead',
+        details: error.details || `Error code: ${error.code || 'UNKNOWN'}`,
+        hint: error.hint || 'Check the lead field configuration to ensure all fields are properly set up',
+        code: error.code
+      }, { status: 500 })
     }
 
     if (!updatedLead) {

@@ -92,21 +92,45 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Account name is required' }, { status: 400 })
     }
 
-    // Clean the account data - convert empty strings to null
+    // Fetch enabled field configurations for this company
+    const { data: fieldConfigs, error: configError } = await supabase
+      .from('account_field_configurations')
+      .select('field_name, is_enabled')
+      .eq('company_id', companyId)
+      .eq('is_enabled', true)
+
+    if (configError) {
+      console.error('Error fetching field configurations:', configError)
+      return NextResponse.json({
+        error: 'Failed to load field configurations',
+        details: configError.message
+      }, { status: 500 })
+    }
+
+    // Get list of enabled field names
+    const enabledFieldNames = new Set(
+      (fieldConfigs || []).map(config => config.field_name)
+    )
+
+    // Clean and filter the account data
+    // Only include fields that are enabled in the configuration
     const cleanedAccountData: any = {}
     Object.keys(accountData).forEach(key => {
-      const value = accountData[key]
-      // Convert empty strings to null, keep other values as-is
-      if (value === '' || value === undefined) {
-        cleanedAccountData[key] = null
-      } else if (typeof value === 'string' && value.trim() === '') {
-        cleanedAccountData[key] = null
-      } else {
-        cleanedAccountData[key] = value
+      // Only process fields that are in the enabled configuration
+      if (enabledFieldNames.has(key)) {
+        const value = accountData[key]
+        // Convert empty strings to null, keep other values as-is
+        if (value === '' || value === undefined) {
+          cleanedAccountData[key] = null
+        } else if (typeof value === 'string' && value.trim() === '') {
+          cleanedAccountData[key] = null
+        } else {
+          cleanedAccountData[key] = value
+        }
       }
     })
 
-    // Check for duplicate (same name AND city) - only if city is provided
+    // Check for duplicate (same name AND city) - only if city is provided and enabled
     if (cleanedAccountData.billing_city) {
       const { data: existing } = await supabase
         .from('accounts')
@@ -123,23 +147,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create account with owner_id set to current user
+    // Build insert data with only enabled fields
+    const insertData: any = {
+      company_id: companyId,
+      ...cleanedAccountData
+    }
+
+    // Only add owner_id and created_by if those fields are enabled
+    if (enabledFieldNames.has('owner_id')) {
+      insertData.owner_id = userId || null
+    }
+    if (enabledFieldNames.has('created_by')) {
+      insertData.created_by = userId || null
+    }
+
+    // Create account
     const { data, error } = await supabase
       .from('accounts')
-      .insert({
-        company_id: companyId,
-        owner_id: userId || null,
-        created_by: userId || null,
-        ...cleanedAccountData,
-        created_at: new Date().toISOString(),
-        modified_date: new Date().toISOString()
-      })
+      .insert(insertData)
       .select()
       .single()
 
     if (error) {
       console.error('Error creating account:', error)
       console.error('Error details:', JSON.stringify(error, null, 2))
+      console.error('Insert data:', JSON.stringify(insertData, null, 2))
       return NextResponse.json({
         error: error.message,
         details: error.details || 'No additional details',
@@ -161,15 +193,36 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, ...updates } = body
+    const { id, companyId, ...updates } = body
 
     if (!id) {
       return NextResponse.json({ error: 'Account ID is required' }, { status: 400 })
     }
 
+    // If companyId is provided, fetch enabled field configurations
+    let enabledFieldNames: Set<string> | null = null
+    if (companyId) {
+      const { data: fieldConfigs, error: configError } = await supabase
+        .from('account_field_configurations')
+        .select('field_name, is_enabled')
+        .eq('company_id', companyId)
+        .eq('is_enabled', true)
+
+      if (!configError && fieldConfigs) {
+        enabledFieldNames = new Set(
+          fieldConfigs.map(config => config.field_name)
+        )
+      }
+    }
+
     // Clean the update data - convert empty strings to null
     const cleanedUpdates: any = {}
     Object.keys(updates).forEach(key => {
+      // If we have field configurations, only process enabled fields
+      if (enabledFieldNames && !enabledFieldNames.has(key)) {
+        return // Skip this field if it's not enabled
+      }
+
       const value = updates[key]
       // Convert empty strings to null, keep other values as-is
       if (value === '' || value === undefined) {
@@ -181,23 +234,28 @@ export async function PUT(request: NextRequest) {
       }
     })
 
-    // Add modified_date timestamp
-    cleanedUpdates.modified_date = new Date().toISOString()
-
     const { data, error } = await supabase
       .from('accounts')
       .update(cleanedUpdates)
       .eq('id', id)
       .select()
       .single()
-    
+
     if (error) {
       console.error('Error updating account:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('Error details:', JSON.stringify(error, null, 2))
+      console.error('Update data:', JSON.stringify(cleanedUpdates, null, 2))
+
+      return NextResponse.json({
+        error: error.message || 'Failed to update account',
+        details: error.details || `Error code: ${error.code || 'UNKNOWN'}`,
+        hint: error.hint || 'Check the account field configuration to ensure all fields are properly set up',
+        code: error.code
+      }, { status: 500 })
     }
-    
+
     return NextResponse.json(data)
-    
+
   } catch (error: any) {
     console.error('PUT account error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
