@@ -10,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Plus, Search, Download, Edit, Package, Upload, ChevronDown, ChevronUp, X, ShoppingCart, CheckCircle, Grid3X3, IndianRupee } from "lucide-react"
 // import { AIProductRecommendations } from "@/components/ai-product-recommendations"
-import { ProductsFileImport } from "@/components/products-file-import"
+import { DynamicImportModal } from "@/components/dynamic-import-modal"
 import { useToast } from "@/hooks/use-toast"
+import { exportToExcel } from "@/lib/excel-export"
 
 // All product data now comes from Supabase backend - no mock data
 
@@ -386,6 +387,46 @@ export function ProductsContent() {
     setZoomedImage(null)
   }
 
+  const handleExport = async () => {
+    try {
+      const success = await exportToExcel(productsList, {
+        filename: `products_${new Date().toISOString().split('T')[0]}`,
+        sheetName: 'Products',
+        columns: [
+          { key: 'productName', label: 'Product Name', width: 30 },
+          { key: 'refNo', label: 'Reference No', width: 15 },
+          { key: 'category', label: 'Category', width: 20 },
+          { key: 'principal', label: 'Principal', width: 20 },
+          { key: 'branch', label: 'Branch', width: 15 },
+          { key: 'description', label: 'Description', width: 40 },
+          { key: 'price', label: 'Price', width: 12 },
+          { key: 'status', label: 'Status', width: 12 },
+          { key: 'assignedTo', label: 'Assigned To', width: 20 }
+        ]
+      })
+
+      if (success) {
+        toast({
+          title: "Data exported",
+          description: "Products data has been exported to Excel file."
+        })
+      } else {
+        toast({
+          title: "Export failed",
+          description: "Failed to export products data. Please try again.",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Export error:', error)
+      toast({
+        title: "Export failed",
+        description: "Failed to export products data. Please try again.",
+        variant: "destructive"
+      })
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case "active":
@@ -427,7 +468,7 @@ export function ProductsContent() {
           <p className="text-gray-600">Manage your laboratory equipment and products</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
             Export Catalog
           </Button>
@@ -736,11 +777,12 @@ export function ProductsContent() {
         context="cross-sell"
       /> */}
 
-      {/* ProductsFileImport component */}
-      <ProductsFileImport 
-        isOpen={isDataImportModalOpen} 
+      {/* Dynamic Import Modal */}
+      <DynamicImportModal
+        isOpen={isDataImportModalOpen}
         onClose={() => setIsDataImportModalOpen(false)}
         onImport={handleImportData}
+        moduleType="products"
         isImporting={isImporting}
         importProgress={importProgress}
       />

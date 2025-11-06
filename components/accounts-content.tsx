@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Search, Download, Edit, Phone, Mail, Building2, Upload, Save, X, Trash2, Users, CheckCircle, Factory, Globe } from "lucide-react"
 import { exportToExcel, formatDateForExcel } from "@/lib/excel-export"
-import { SimpleFileImport } from "@/components/simple-file-import"
+import { DynamicImportModal } from "@/components/dynamic-import-modal"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { useRouter } from "next/navigation"
@@ -437,7 +437,7 @@ export function AccountsContent() {
       // Set loading state
       setIsImporting(true)
       setImportProgress({ current: 0, total: data.length })
-      
+
       // Get current user's company ID
       const storedUser = localStorage.getItem('user')
       if (!storedUser) {
@@ -449,9 +449,10 @@ export function AccountsContent() {
         setIsImporting(false)
         return
       }
-      
+
       const user = JSON.parse(storedUser)
-      if (!user.company_id) {
+      const companyId = user.company_id
+      if (!companyId) {
         toast({
           title: "Error",
           description: "Company not found. Please login again.",
@@ -460,39 +461,21 @@ export function AccountsContent() {
         setIsImporting(false)
         return
       }
-      
+
       console.log("Starting import of", data.length, "records")
       console.log("Sample data item:", data[0])
-      
+
       // Show initial toast
       toast({
         title: "Import started",
         description: `Processing ${data.length} records...`
       })
-      
-      // Prepare accounts for import - flexible field mapping
-      const accountsToImport = data.map(item => {
-        // Try multiple possible field names for account name
-        const accountName = item.accountName || item['Account Name'] || item.account_name || 
-                           item.leadName || item['Lead Name'] || item.lead_name ||
-                           item.name || item.Name || item.companyName || item['Company Name'] || ''
-        
-        return {
-          account_name: accountName,
-          industry: item.industry || item.Industry || '',
-          phone: item['Contact Phone'] || item.contactPhone || item.phone || item.Phone || item.contactNo || item['Contact Number'] || item.contact_no || '',
-          email: item.email || item.Email || item['Email Address'] || item.emailAddress || item.contact_email || '',
-          website: item.website || item.Website || '',
-          billing_street: item.address || item.Address || item['Full Address'] || item.fullAddress || '',
-          billing_city: item.city || item.City || item.billing_city || '',
-          billing_state: item.state || item.State || item.billing_state || '',
-          billing_country: item.country || item.Country || item.billing_country || 'India',
-          status: 'Active', // Default status since we removed it from template
-          contact_name: item.contactName || item['Contact Name'] || item.contact_name || item['Contact Person'] || '',
-          assigned_to: item['Assigned To'] || item.assignedTo || item.assigned_to || item['Assigned to'] || item.owner || item.Owner || '',
-          owner_id: user.id
-        }
-      })
+
+      // The data comes already mapped from field_name, so we can use it directly
+      const accountsToImport = data.map(item => ({
+        ...item,
+        owner_id: user.id
+      }))
       
       let successCount = 0
       let failCount = 0
@@ -506,15 +489,17 @@ export function AccountsContent() {
         // Update progress
         setImportProgress({ current: i + 1, total: accountsToImport.length })
         
-        if (!account.account_name || account.account_name.trim() === '') {
+        // Skip if no account name
+        const accountName = account.account_name || account.accountName
+        if (!accountName || accountName.trim() === '') {
           console.log(`Skipping row ${i + 2} with no account name:`, account)
           failCount++
           continue
         }
-        
+
         try {
-          console.log("Importing account:", account.account_name)
-          
+          console.log("Importing account:", accountName)
+
           const response = await fetch('/api/accounts', {
             method: 'POST',
             headers: {
@@ -1289,11 +1274,12 @@ export function AccountsContent() {
         </DialogContent>
       </Dialog>
 
-      {/* Simple File Import */}
-      <SimpleFileImport
+      {/* Dynamic Import Modal */}
+      <DynamicImportModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         onImport={handleImportData}
+        moduleType="accounts"
         isImporting={isImporting}
         importProgress={importProgress}
       />

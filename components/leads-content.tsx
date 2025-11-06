@@ -12,7 +12,7 @@ import { AIEmailGenerator } from "@/components/ai-email-generator"
 import { AIRecommendationService, type LeadData } from "@/lib/ai-services"
 import AgenticAIService from "@/lib/agentic-ai-service"
 import { AILeadIntelligenceCard } from "@/components/ai-lead-intelligence-card"
-import { DataImportModal } from "@/components/data-import-modal"
+import { DynamicImportModal } from "@/components/dynamic-import-modal"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -143,23 +143,23 @@ export function LeadsContent() {
     try {
       // Load ALL leads without any filtering
       const response = await fetch(`/api/leads`)
-      
+
       if (response.ok) {
         const apiLeads = await response.json()
-        
-        // For each lead, fetch its products from lead_products table
+
+        // For each lead, fetch its products and contact details
         const leadsWithProducts = await Promise.all(
           apiLeads.map(async (lead: any) => {
             try {
               // Try to fetch lead products
               const productsResponse = await fetch(`/api/leads/${lead.id}/products`)
               let leadProducts = []
-              
+
               if (productsResponse.ok) {
                 const responseData = await productsResponse.json()
                 leadProducts = responseData.products || responseData || []
               }
-              
+
               // If no products in junction table, use legacy single product
               if (leadProducts.length === 0 && lead.product_name) {
                 leadProducts = [{
@@ -169,8 +169,46 @@ export function LeadsContent() {
                   total_amount: (lead.quantity || 1) * (lead.price_per_unit || 0)
                 }]
               }
-              
-              return { ...lead, leadProducts }
+
+              // Determine contact_id - newer leads use 'contact' field, older use 'contact_id'
+              const actualContactId = lead.contact_id || lead.contact
+
+              // Fetch contact details if contact_id exists
+              let contactDetails = null
+              if (actualContactId) {
+                try {
+                  const contactResponse = await fetch(`/api/contacts?companyId=${lead.company_id}`)
+                  if (contactResponse.ok) {
+                    const contacts = await contactResponse.json()
+                    const allContacts = contacts.contacts || contacts || []
+                    contactDetails = allContacts.find((c: any) => c.id === actualContactId)
+                  }
+                } catch (err) {
+                  console.error('Error fetching contact details:', err)
+                }
+              }
+
+              // Fetch account details if account_id exists
+              let accountDetails = null
+              const actualAccountId = lead.account_id || lead.account
+              if (actualAccountId) {
+                try {
+                  const accountResponse = await fetch(`/api/accounts?companyId=${lead.company_id}`)
+                  if (accountResponse.ok) {
+                    const accounts = await accountResponse.json()
+                    accountDetails = accounts.find((a: any) => a.id === actualAccountId)
+                  }
+                } catch (err) {
+                  console.error('Error fetching account details:', err)
+                }
+              }
+
+              return {
+                ...lead,
+                leadProducts,
+                contactDetails,
+                accountDetails
+              }
             } catch (error) {
               console.error(`Error fetching products for lead ${lead.id}:`, error)
               // Fallback to legacy single product
@@ -186,45 +224,87 @@ export function LeadsContent() {
         )
         
         // Transform API data to match UI format
-        const transformedLeads = leadsWithProducts.map((lead: any) => ({
-          id: lead.id,
-          date: new Date(lead.lead_date || lead.created_at).toLocaleDateString('en-GB'),
-          leadName: lead.account_name,
-          accountId: lead.account_id,
-          accountName: lead.account_name,
-          contactId: lead.contact_id,
-          contactName: lead.contact_name,
-          department: lead.department || '',
-          contactNo: lead.phone,
-          phone: lead.phone,
-          email: lead.email,
-          whatsapp: lead.whatsapp || lead.phone,
-          assignedTo: lead.assigned_to,
-          product: lead.product_name, // Keep for backward compatibility
-          productId: lead.product_id,
-          leadSource: lead.lead_source,
-          salesStage: lead.lead_status,
-          leadStatus: lead.lead_status,
-          status: 'active',
-          priority: lead.priority || 'medium',
-          location: lead.location || '',
-          city: lead.city || '',
-          state: lead.state || '',
-          country: lead.country || '',
-          address: lead.address || '',
-          closingDate: lead.expected_closing_date || '',
-          buyerRef: lead.buyer_ref || '',
-          budget: lead.budget,
-          quantity: lead.quantity,
-          pricePerUnit: lead.price_per_unit,
-          expectedClosingDate: lead.expected_closing_date,
-          nextFollowupDate: lead.next_followup_date,
-          notes: lead.notes,
-          // Add multiple products support
-          leadProducts: lead.leadProducts || [],
-          totalProducts: lead.leadProducts?.length || 0,
-          calculatedBudget: lead.leadProducts?.reduce((sum: number, p: any) => sum + (p.total_amount || 0), 0) || lead.budget || 0
-        }))
+        const transformedLeads = leadsWithProducts.map((lead: any) => {
+          // Use fetched account details or fallback to lead's account_name
+          const accountName = lead.accountDetails?.account_name || lead.account_name || ''
+
+          // Priority: Direct fields on lead > Contact details > Legacy fields
+          const contactName = (lead.first_name || lead.last_name)
+            ? `${lead.first_name || ''} ${lead.last_name || ''}`.trim()
+            : lead.contactDetails
+              ? `${lead.contactDetails.first_name || ''} ${lead.contactDetails.last_name || ''}`.trim()
+              : lead.contact_name || ''
+
+          const contactPhone = lead.phone_number || lead.contactDetails?.phone_mobile || lead.contactDetails?.phone_work || lead.phone || ''
+          const contactEmail = lead.email_address || lead.contactDetails?.email_primary || lead.email || ''
+          const contactWhatsApp = contactPhone || lead.contactDetails?.whatsapp || lead.whatsapp || ''
+          const contactDepartment = lead.department || lead.contactDetails?.department || ''
+          const leadTitle = lead.lead_title || accountName || ''
+
+          // Debug logging
+          if (lead.id === '185c015c-6079-4303-ab01-44d120d1e3f9') {
+            console.log('DEBUG Lead Transform:', {
+              leadId: lead.id,
+              leadTitle,
+              accountName,
+              accountDetails: lead.accountDetails,
+              contactName,
+              contactPhone,
+              contactEmail,
+              department: contactDepartment,
+              rawLead: {
+                first_name: lead.first_name,
+                last_name: lead.last_name,
+                phone_number: lead.phone_number,
+                email_address: lead.email_address,
+                lead_title: lead.lead_title,
+                account: lead.account,
+                contact: lead.contact
+              }
+            })
+          }
+
+          return {
+            id: lead.id,
+            date: new Date(lead.lead_date || lead.created_at).toLocaleDateString('en-GB'),
+            leadName: leadTitle || accountName,
+            leadTitle: leadTitle,
+            accountId: lead.account_id || lead.account,
+            accountName: accountName,
+            contactId: lead.contact_id || lead.contact,
+            contactName: contactName,
+            department: contactDepartment,
+            contactNo: contactPhone,
+            phone: contactPhone,
+            email: contactEmail,
+            whatsapp: contactWhatsApp,
+            assignedTo: lead.assigned_to,
+            product: lead.product_name, // Keep for backward compatibility
+            productId: lead.product_id,
+            leadSource: lead.lead_source,
+            salesStage: lead.lead_status,
+            leadStatus: lead.lead_status,
+            status: 'active',
+            priority: lead.priority || 'medium',
+            location: lead.location || '',
+            city: lead.city || '',
+            state: lead.state || '',
+            country: lead.country || '',
+            address: lead.address || '',
+            closingDate: lead.expected_closing_date || '',
+            buyerRef: lead.buyer_ref || '',
+            budget: lead.budget,
+            quantity: lead.quantity,
+            pricePerUnit: lead.price_per_unit,
+            expectedClosingDate: lead.expected_closing_date,
+            nextFollowupDate: lead.next_followup_date,
+            notes: lead.notes,
+            // Add multiple products support
+            leadProducts: lead.leadProducts || [],
+            totalProducts: lead.leadProducts?.length || 0,
+            calculatedBudget: lead.leadProducts?.reduce((sum: number, p: any) => sum + (p.total_amount || 0), 0) || lead.budget || 0
+          }
+        })
         
         console.log("loadLeads - API leads:", transformedLeads)
         setLeadsList(transformedLeads)
@@ -719,8 +799,10 @@ export function LeadsContent() {
         sheetName: 'Leads',
         columns: [
           { key: 'id', label: 'Lead ID', width: 12 },
-          { key: 'leadName', label: 'Company Name', width: 20 },
+          { key: 'leadTitle', label: 'Lead Title', width: 25 },
+          { key: 'accountName', label: 'Account Name', width: 20 },
           { key: 'contactName', label: 'Contact Person', width: 18 },
+          { key: 'department', label: 'Department', width: 15 },
           { key: 'contactNo', label: 'Contact Phone', width: 15 },
           { key: 'email', label: 'Email', width: 25 },
           { key: 'whatsapp', label: 'WhatsApp', width: 15 },
@@ -728,10 +810,13 @@ export function LeadsContent() {
           { key: 'state', label: 'State', width: 15 },
           { key: 'location', label: 'Location', width: 20 },
           { key: 'product', label: 'Product Interest', width: 25 },
+          { key: 'budget', label: 'Budget', width: 15 },
+          { key: 'leadSource', label: 'Lead Source', width: 15 },
           { key: 'salesStage', label: 'Sales Stage', width: 15 },
           { key: 'priority', label: 'Priority', width: 12 },
           { key: 'assignedTo', label: 'Assigned To', width: 15 },
-          { key: 'closingDate', label: 'Closing Date', width: 15 },
+          { key: 'expectedClosingDate', label: 'Expected Closing', width: 15 },
+          { key: 'nextFollowupDate', label: 'Next Followup', width: 15 },
           { key: 'status', label: 'Status', width: 12 },
           { key: 'date', label: 'Created Date', width: 15 }
         ]
@@ -864,7 +949,6 @@ export function LeadsContent() {
                   {/* Account Details */}
                   <div>
                     <div className="flex items-center space-x-2">
-                      <h3 className="font-semibold">{lead.leadName}</h3>
                       <span
                         className={`px-2 py-1 text-xs rounded-full ${
                           lead.status === "active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
@@ -873,15 +957,12 @@ export function LeadsContent() {
                         {lead.status}
                       </span>
                     </div>
-                    {lead.department && lead.department !== "None" && (
-                      <p className="text-sm font-medium text-blue-600 mb-1">Department: {lead.department}</p>
-                    )}
-                    <p className="text-sm text-gray-600">
-                      {lead.city && lead.state ? `${lead.city}, ${lead.state}` : 
-                       lead.city ? lead.city : 
-                       lead.state ? lead.state : 
-                       lead.location || 'Location not specified'}
+                    <p className="text-sm font-semibold text-gray-900 mt-1">
+                      Lead Title: {lead.leadName || lead.accountName}
                     </p>
+                    {lead.department && lead.department !== "None" && (
+                      <p className="text-sm text-gray-600">Department: {lead.department}</p>
+                    )}
                   </div>
                   
                   {/* Contact Details - Just beside account */}
@@ -907,13 +988,12 @@ export function LeadsContent() {
                   <div className="ml-14">
                     <div className="flex items-start gap-x-14">
                       {/* Smart Products Display */}
-                      <ProductsDisplay 
-                        leadProducts={lead.leadProducts} 
-                        totalBudget={lead.calculatedBudget} 
+                      <ProductsDisplay
+                        leadProducts={lead.leadProducts}
+                        totalBudget={lead.calculatedBudget}
                       />
                       <div className="text-xs text-gray-500">
                         <p>Stage: {lead.leadStatus || lead.salesStage}</p>
-                        <p>Assigned to: {lead.assignedTo}</p>
                       </div>
                     </div>
                   </div>
@@ -976,8 +1056,8 @@ export function LeadsContent() {
       {/* AI Intelligence Section - Real-time analysis using agentic AI */}
       <AILeadIntelligenceCard leads={leadsList} />
 
-      {/* Import Modal */}
-      <DataImportModal
+      {/* Dynamic Import Modal */}
+      <DynamicImportModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         moduleType="leads"

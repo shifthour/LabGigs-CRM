@@ -6,7 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Edit, Mail, Phone, User, Users, Building2, Globe } from "lucide-react"
+import { Plus, Search, Edit, Mail, Phone, User, Users, Building2, Globe, Download, Upload } from "lucide-react"
+import { exportToExcel } from "@/lib/excel-export"
+import { DynamicImportModal } from "@/components/dynamic-import-modal"
 
 // Custom WhatsApp Icon Component
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -49,6 +51,9 @@ export function ContactsContent() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 })
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
@@ -110,6 +115,143 @@ export function ContactsContent() {
     router.push(`/contacts/edit/${contactId}`)
   }
 
+  const handleExport = async () => {
+    try {
+      const success = await exportToExcel(contacts, {
+        filename: `contacts_${new Date().toISOString().split('T')[0]}`,
+        sheetName: 'Contacts',
+        columns: [
+          { key: 'first_name', label: 'First Name', width: 15 },
+          { key: 'last_name', label: 'Last Name', width: 15 },
+          { key: 'email_primary', label: 'Email', width: 25 },
+          { key: 'phone_mobile', label: 'Mobile Phone', width: 15 },
+          { key: 'job_title', label: 'Job Title', width: 20 },
+          { key: 'company_name', label: 'Company Name', width: 20 },
+          { key: 'lifecycle_stage', label: 'Lifecycle Stage', width: 15 },
+          { key: 'current_contact_status', label: 'Status', width: 12 },
+          { key: 'created_at', label: 'Created Date', width: 15 }
+        ]
+      })
+
+      if (success) {
+        toast({
+          title: "Data exported",
+          description: "Contacts data has been exported to Excel file."
+        })
+      } else {
+        toast({
+          title: "Export failed",
+          description: "Failed to export contacts data. Please try again.",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Export error:', error)
+      toast({
+        title: "Export failed",
+        description: "Failed to export contacts data. Please try again.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleImportData = async (data: any[]) => {
+    try {
+      setIsImporting(true)
+      setImportProgress({ current: 0, total: data.length })
+
+      const user = localStorage.getItem('user')
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "User not found. Please login again.",
+          variant: "destructive"
+        })
+        setIsImporting(false)
+        return
+      }
+
+      const parsedUser = JSON.parse(user)
+      const companyId = parsedUser.company_id
+
+      toast({
+        title: "Import started",
+        description: `Processing ${data.length} records...`
+      })
+
+      let successCount = 0
+      let failCount = 0
+
+      for (let i = 0; i < data.length; i++) {
+        const item = data[i]
+        setImportProgress({ current: i + 1, total: data.length })
+
+        // Data comes already mapped from field_name
+        const contactData = {
+          ...item,
+          company_id: companyId
+        }
+
+        // Validate required fields (assuming first_name and email_primary are required)
+        if (!contactData.first_name || !contactData.email_primary) {
+          console.log(`Skipping row ${i + 2} - missing required fields`)
+          failCount++
+          continue
+        }
+
+        try {
+          const response = await fetch('/api/contacts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(contactData)
+          })
+
+          if (response.ok) {
+            successCount++
+          } else {
+            const errorText = await response.text()
+            if (response.status === 400 && errorText.includes('already exists')) {
+              successCount++ // Consider duplicate as success
+            } else {
+              failCount++
+            }
+          }
+        } catch (error) {
+          console.error('Error importing contact:', error)
+          failCount++
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
+
+      setTimeout(async () => {
+        await fetchContacts()
+      }, 1000)
+
+      setIsImporting(false)
+      setImportProgress({ current: 0, total: 0 })
+      setIsImportModalOpen(false)
+
+      toast({
+        title: "Import completed",
+        description: `Processed ${successCount}/${data.length} contacts successfully. ${failCount > 0 ? `Skipped: ${failCount}` : ''}`
+      })
+
+    } catch (error) {
+      console.error('Import error:', error)
+      setIsImporting(false)
+      setImportProgress({ current: 0, total: 0 })
+
+      toast({
+        title: "Import failed",
+        description: "An error occurred while importing contacts.",
+        variant: "destructive"
+      })
+    }
+  }
+
   const filteredContacts = contacts.filter(contact =>
     contact.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     contact.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -136,10 +278,20 @@ export function ContactsContent() {
           <h1 className="text-3xl font-bold text-gray-900">Contacts</h1>
           <p className="text-gray-600 mt-1">Manage your contacts and relationships</p>
         </div>
-        <Button onClick={() => router.push('/contacts/add')} className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="w-4 h-4 mr-2" />
-          Add New Contact
-        </Button>
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="w-4 h-4 mr-2" />
+            Export
+          </Button>
+          <Button variant="outline" onClick={() => setIsImportModalOpen(true)}>
+            <Upload className="w-4 h-4 mr-2" />
+            Import Data
+          </Button>
+          <Button onClick={() => router.push('/contacts/add')} className="bg-blue-600 hover:bg-blue-700">
+            <Plus className="w-4 h-4 mr-2" />
+            Add New Contact
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -386,6 +538,16 @@ export function ContactsContent() {
           )}
         </CardContent>
       </Card>
+
+      {/* Dynamic Import Modal */}
+      <DynamicImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleImportData}
+        moduleType="contacts"
+        isImporting={isImporting}
+        importProgress={importProgress}
+      />
     </div>
   )
 }
