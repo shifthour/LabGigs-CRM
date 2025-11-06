@@ -256,38 +256,6 @@ export function AccountsContent() {
     router.push(`/accounts/edit/${account.id}`)
   }
 
-  const handleDeleteAccount = async (id: string) => {
-    if (confirm("Are you sure you want to delete this account?")) {
-      try {
-        const response = await fetch(`/api/accounts?id=${id}`, {
-          method: 'DELETE',
-        })
-        
-        if (response.ok) {
-          // Immediately remove from state
-          setAccounts(prevAccounts => prevAccounts.filter(acc => acc.id !== id))
-          
-          // Reload accounts from API to get updated stats
-          await loadAccountsFromAPI()
-          
-          toast({
-            title: "Account deleted",
-            description: "The account has been successfully deleted."
-          })
-        } else {
-          throw new Error("Failed to delete account")
-        }
-      } catch (error) {
-        console.error("Error deleting account:", error)
-        toast({
-          title: "Error",
-          description: "Failed to delete account",
-          variant: "destructive"
-        })
-      }
-    }
-  }
-
   const handleSaveAccount = async () => {
     console.log("handleSaveAccount called with formData:", formData)
     
