@@ -342,3 +342,38 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams
+    const id = searchParams.get('id')
+    const companyId = searchParams.get('companyId')
+
+    if (!id || !companyId) {
+      return NextResponse.json({ error: 'Lead ID and Company ID are required' }, { status: 400 })
+    }
+
+    // Delete associated lead products first
+    await supabase
+      .from('lead_products')
+      .delete()
+      .eq('lead_id', id)
+
+    // Delete the lead
+    const { error } = await supabase
+      .from('leads')
+      .delete()
+      .eq('id', id)
+      .eq('company_id', companyId)
+
+    if (error) {
+      console.error('Error deleting lead:', error)
+      return NextResponse.json({ error: 'Failed to delete lead' }, { status: 500 })
+    }
+
+    return NextResponse.json({ message: 'Lead deleted successfully' })
+  } catch (error) {
+    console.error('Unexpected error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}

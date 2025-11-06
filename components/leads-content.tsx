@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { EnhancedCard } from "@/components/ui/enhanced-card"
 import { StatusIndicator } from "@/components/ui/status-indicator"
-import { Plus, Download, Edit, Phone, Users, Target, TrendingUp, Clock, Zap, Filter, Mail, MessageCircle, Upload, Save, X, CheckCircle, Search, Coins } from "lucide-react"
+import { Plus, Download, Edit, Phone, Users, Target, TrendingUp, Clock, Zap, Filter, Mail, MessageCircle, Upload, Save, X, CheckCircle, Search, Coins, Trash2 } from "lucide-react"
 import { exportToExcel, formatDateForExcel } from "@/lib/excel-export"
 import { AILeadScore } from "@/components/ai-lead-score"
 import { AIEmailGenerator } from "@/components/ai-email-generator"
@@ -126,6 +126,7 @@ export function LeadsContent() {
   const [editingLead, setEditingLead] = useState<any>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false)
+  const [deletingLeadId, setDeletingLeadId] = useState<string | null>(null)
   const [statsLoaded, setStatsLoaded] = useState(false)
   const [leadsStats, setLeadsStats] = useState({
     total: 0,
@@ -504,6 +505,43 @@ export function LeadsContent() {
 
   const handleEditLead = (lead: any) => {
     router.push(`/leads/edit/${lead.id}`)
+  }
+
+  const handleDeleteLead = async (leadId: string, leadName: string) => {
+    if (!confirm(`Are you sure you want to delete "${leadName}"? This action cannot be undone.`)) {
+      return
+    }
+
+    setDeletingLeadId(leadId)
+
+    try {
+      const companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
+
+      const response = await fetch(`/api/leads?id=${leadId}&companyId=${companyId}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete lead')
+      }
+
+      toast({
+        title: "Lead deleted",
+        description: `"${leadName}" has been deleted successfully.`
+      })
+
+      // Reload leads
+      await loadLeads()
+    } catch (error) {
+      console.error('Error deleting lead:', error)
+      toast({
+        title: "Delete failed",
+        description: "Failed to delete lead. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setDeletingLeadId(null)
+    }
   }
 
   const handleAddLead = () => {
@@ -1037,13 +1075,27 @@ export function LeadsContent() {
                     )}
                     
                     {/* Action Buttons */}
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       title="Edit Lead"
                       onClick={() => handleEditLead(lead)}
                     >
                       <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Delete Lead"
+                      onClick={() => handleDeleteLead(lead.id, lead.leadName || lead.accountName)}
+                      disabled={deletingLeadId === lead.id}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      {deletingLeadId === lead.id ? (
+                        <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
                     </Button>
                   </div>
                 </div>

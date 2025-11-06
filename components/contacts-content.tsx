@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Edit, Mail, Phone, User, Users, Building2, Globe, Download, Upload } from "lucide-react"
+import { Plus, Search, Edit, Mail, Phone, User, Users, Building2, Globe, Download, Upload, Trash2 } from "lucide-react"
 import { exportToExcel } from "@/lib/excel-export"
 import { DynamicImportModal } from "@/components/dynamic-import-modal"
 
@@ -54,6 +54,7 @@ export function ContactsContent() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 })
+  const [deletingContactId, setDeletingContactId] = useState<string | null>(null)
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
@@ -113,6 +114,55 @@ export function ContactsContent() {
 
   const handleEditContact = (contactId: string) => {
     router.push(`/contacts/edit/${contactId}`)
+  }
+
+  const handleDeleteContact = async (contactId: string, contactName: string) => {
+    if (!confirm(`Are you sure you want to delete "${contactName}"? This action cannot be undone.`)) {
+      return
+    }
+
+    setDeletingContactId(contactId)
+
+    try {
+      const user = localStorage.getItem('user')
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "User not found. Please login again.",
+          variant: "destructive"
+        })
+        setDeletingContactId(null)
+        return
+      }
+
+      const parsedUser = JSON.parse(user)
+      const companyId = parsedUser.company_id
+
+      const response = await fetch(`/api/contacts/${contactId}?companyId=${companyId}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete contact')
+      }
+
+      toast({
+        title: "Contact deleted",
+        description: `"${contactName}" has been deleted successfully.`
+      })
+
+      // Reload contacts
+      await fetchContacts()
+    } catch (error) {
+      console.error('Error deleting contact:', error)
+      toast({
+        title: "Delete failed",
+        description: "Failed to delete contact. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setDeletingContactId(null)
+    }
   }
 
   const handleExport = async () => {
@@ -530,6 +580,20 @@ export function ContactsContent() {
                       onClick={() => handleEditContact(contact.id)}
                     >
                       <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Delete Contact"
+                      onClick={() => handleDeleteContact(contact.id, `${contact.first_name} ${contact.last_name}`)}
+                      disabled={deletingContactId === contact.id}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      {deletingContactId === contact.id ? (
+                        <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
                     </Button>
                   </div>
                 </div>

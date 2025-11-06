@@ -68,6 +68,7 @@ export function AccountsContent() {
   const [isImporting, setIsImporting] = useState(false)
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 })
   const [isSaving, setIsSaving] = useState(false)
+  const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null)
   const [isLoadingStats, setIsLoadingStats] = useState(true)
   const [accountStats, setAccountStats] = useState({
     total: 0,
@@ -638,6 +639,55 @@ export function AccountsContent() {
     }
   }
 
+  const handleDeleteAccount = async (accountId: string, accountName: string) => {
+    if (!confirm(`Are you sure you want to delete "${accountName}"? This action cannot be undone.`)) {
+      return
+    }
+
+    setDeletingAccountId(accountId)
+
+    try {
+      const user = localStorage.getItem('user')
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "User not found. Please login again.",
+          variant: "destructive"
+        })
+        setDeletingAccountId(null)
+        return
+      }
+
+      const parsedUser = JSON.parse(user)
+      const companyId = parsedUser.company_id
+
+      const response = await fetch(`/api/accounts?id=${accountId}&companyId=${companyId}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete account')
+      }
+
+      toast({
+        title: "Account deleted",
+        description: `"${accountName}" has been deleted successfully.`
+      })
+
+      // Reload accounts
+      await loadAccounts()
+    } catch (error) {
+      console.error('Error deleting account:', error)
+      toast({
+        title: "Delete failed",
+        description: "Failed to delete account. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setDeletingAccountId(null)
+    }
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -957,13 +1007,27 @@ export function AccountsContent() {
                         )}
                         
                         {/* Action Buttons */}
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           title="Edit Account"
                           onClick={() => handleEditAccount(account)}
                         >
                           <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="Delete Account"
+                          onClick={() => handleDeleteAccount(account.id, account.accountName)}
+                          disabled={deletingAccountId === account.id}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          {deletingAccountId === account.id ? (
+                            <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
                         </Button>
                       </div>
                     </div>

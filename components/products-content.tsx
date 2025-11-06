@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Plus, Search, Download, Edit, Package, Upload, ChevronDown, ChevronUp, X, ShoppingCart, CheckCircle, Grid3X3, IndianRupee } from "lucide-react"
+import { Plus, Search, Download, Edit, Package, Upload, ChevronDown, ChevronUp, X, ShoppingCart, CheckCircle, Grid3X3, IndianRupee, Trash2 } from "lucide-react"
 // import { AIProductRecommendations } from "@/components/ai-product-recommendations"
 import { DynamicImportModal } from "@/components/dynamic-import-modal"
 import { useToast } from "@/hooks/use-toast"
@@ -41,6 +41,7 @@ export function ProductsContent() {
   const [isImporting, setIsImporting] = useState(false)
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 })
   const [zoomedImage, setZoomedImage] = useState<{ url: string; name: string } | null>(null)
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
 
   // Load products from database on component mount
   useEffect(() => {
@@ -427,6 +428,55 @@ export function ProductsContent() {
     }
   }
 
+  const handleDeleteProduct = async (productId: string, productName: string) => {
+    if (!confirm(`Are you sure you want to delete "${productName}"? This action cannot be undone.`)) {
+      return
+    }
+
+    setDeletingProductId(productId)
+
+    try {
+      const user = localStorage.getItem('user')
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "User not found. Please login again.",
+          variant: "destructive"
+        })
+        setDeletingProductId(null)
+        return
+      }
+
+      const parsedUser = JSON.parse(user)
+      const companyId = parsedUser.company_id
+
+      const response = await fetch(`/api/products?id=${productId}&companyId=${companyId}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete product')
+      }
+
+      toast({
+        title: "Product deleted",
+        description: `"${productName}" has been deleted successfully.`
+      })
+
+      // Reload products
+      await loadProducts()
+    } catch (error) {
+      console.error('Error deleting product:', error)
+      toast({
+        title: "Delete failed",
+        description: "Failed to delete product. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setDeletingProductId(null)
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case "active":
@@ -756,11 +806,32 @@ export function ProductsContent() {
                         </span>
                       </div>
                     )}
-                    
-                    <Button variant="outline" size="sm" onClick={() => handleEditProduct(product)}>
-                      <Edit className="w-4 h-4 mr-1" />
-                      Edit
-                    </Button>
+
+                    <div className="flex space-x-2">
+                      <Button variant="outline" size="sm" onClick={() => handleEditProduct(product)}>
+                        <Edit className="w-4 h-4 mr-1" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteProduct(product.id, product.productName)}
+                        disabled={deletingProductId === product.id}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        {deletingProductId === product.id ? (
+                          <>
+                            <div className="w-4 h-4 mr-1 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                            Deleting...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Delete
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
                 )
