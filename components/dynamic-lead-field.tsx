@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -22,8 +23,10 @@ interface DynamicLeadFieldProps {
   value: any
   onChange: (fieldName: string, value: any) => void
   error?: string
-  // For dependent dropdowns if needed in the future
+  // For dependent dropdowns and auto-population
   dependentValues?: Record<string, any>
+  onAccountSelect?: (accountData: any) => void
+  onContactSelect?: (contactData: any) => void
 }
 
 export function DynamicLeadField({
@@ -31,13 +34,159 @@ export function DynamicLeadField({
   value,
   onChange,
   error,
-  dependentValues = {}
+  dependentValues = {},
+  onAccountSelect,
+  onContactSelect
 }: DynamicLeadFieldProps) {
+  const [accounts, setAccounts] = useState<any[]>([])
+  const [contacts, setContacts] = useState<any[]>([])
+  const [users, setUsers] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+
+  // Fetch accounts when field is 'account'
+  useEffect(() => {
+    if (config.field_name === 'account' && config.field_type === 'select_dependent') {
+      fetchAccounts()
+    }
+  }, [config.field_name, config.field_type])
+
+  // Fetch contacts when field is 'contact' and account is selected
+  useEffect(() => {
+    if (config.field_name === 'contact' && config.field_type === 'select_dependent') {
+      if (dependentValues.account_id) {
+        fetchContacts(dependentValues.account_id)
+      } else {
+        setContacts([])
+      }
+    }
+  }, [config.field_name, config.field_type, dependentValues.account_id])
+
+  // Fetch users when field is 'assigned_to'
+  useEffect(() => {
+    if (config.field_name === 'assigned_to' && config.field_type === 'select_dependent') {
+      fetchUsers()
+    }
+  }, [config.field_name, config.field_type])
+
+  const fetchAccounts = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/accounts')
+      if (response.ok) {
+        const data = await response.json()
+        setAccounts(data.accounts || [])
+      }
+    } catch (error) {
+      console.error('Error fetching accounts:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchContacts = async (accountId: string) => {
+    try {
+      setLoading(true)
+      const response = await fetch(`/api/contacts?accountId=${accountId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setContacts(data.contacts || [])
+      }
+    } catch (error) {
+      console.error('Error fetching contacts:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true)
+      const user = localStorage.getItem('user')
+      if (!user) return
+
+      const parsedUser = JSON.parse(user)
+      const companyId = parsedUser.company_id
+
+      const response = await fetch(`/api/users?companyId=${companyId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setUsers(data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleChange = (newValue: any) => {
+    // For account dropdown, find the account ID by matching the display name
+    if (config.field_name === 'account' && config.field_type === 'select_dependent') {
+      const selectedAccount = accounts.find(acc => {
+        const displayName = acc.account_name || acc.name || `Account ${acc.id}`
+        return displayName === newValue
+      })
+
+      if (selectedAccount) {
+        onChange(config.field_name, selectedAccount.id)
+        if (onAccountSelect) {
+          onAccountSelect(selectedAccount)
+        }
+      }
+      return
+    }
+
+    // For contact dropdown, find the contact ID by matching the display name
+    if (config.field_name === 'contact' && config.field_type === 'select_dependent') {
+      const selectedContact = contacts.find(cont => {
+        const firstName = cont.first_name || ''
+        const lastName = cont.last_name || ''
+        const displayName = `${firstName} ${lastName}`.trim() || cont.email || `Contact ${cont.id}`
+        return displayName === newValue
+      })
+
+      if (selectedContact) {
+        onChange(config.field_name, selectedContact.id)
+        if (onContactSelect) {
+          onContactSelect(selectedContact)
+        }
+      }
+      return
+    }
+
+    // For assigned_to dropdown, find the user full_name by matching the display name
+    if (config.field_name === 'assigned_to' && config.field_type === 'select_dependent') {
+      const selectedUser = users.find(user => user.full_name === newValue)
+      if (selectedUser) {
+        onChange(config.field_name, selectedUser.full_name)
+      }
+      return
+    }
+
+    // For all other fields, use the value as-is
     onChange(config.field_name, newValue)
   }
 
   const getOptions = () => {
+    // Special handling for account dropdown
+    if (config.field_name === 'account' && config.field_type === 'select_dependent') {
+      return Array.isArray(accounts) ? accounts.map(acc => acc.account_name || acc.name || `Account ${acc.id}`) : []
+    }
+
+    // Special handling for contact dropdown
+    if (config.field_name === 'contact' && config.field_type === 'select_dependent') {
+      return Array.isArray(contacts) ? contacts.map(cont => {
+        const firstName = cont.first_name || ''
+        const lastName = cont.last_name || ''
+        return `${firstName} ${lastName}`.trim() || cont.email || `Contact ${cont.id}`
+      }) : []
+    }
+
+    // Special handling for assigned_to dropdown
+    if (config.field_name === 'assigned_to' && config.field_type === 'select_dependent') {
+      return Array.isArray(users) ? users.map(user => user.full_name || user.email || `User ${user.id}`) : []
+    }
+
     // Special handling for lead_source field
     if (config.field_name === 'lead_source') {
       return [
@@ -105,6 +254,32 @@ export function DynamicLeadField({
     return config.field_options || []
   }
 
+  const getDisplayValue = () => {
+    if (!value) return ''
+
+    // For account dropdown, convert ID to display name
+    if (config.field_name === 'account' && config.field_type === 'select_dependent') {
+      const selectedAccount = accounts.find(acc => acc.id === value)
+      if (selectedAccount) {
+        return selectedAccount.account_name || selectedAccount.name || `Account ${selectedAccount.id}`
+      }
+      return ''
+    }
+
+    // For contact dropdown, convert ID to display name
+    if (config.field_name === 'contact' && config.field_type === 'select_dependent') {
+      const selectedContact = contacts.find(cont => cont.id === value)
+      if (selectedContact) {
+        const firstName = selectedContact.first_name || ''
+        const lastName = selectedContact.last_name || ''
+        return `${firstName} ${lastName}`.trim() || selectedContact.email || `Contact ${selectedContact.id}`
+      }
+      return ''
+    }
+
+    return value
+  }
+
   const renderField = () => {
     switch (config.field_type) {
       case 'text':
@@ -160,15 +335,23 @@ export function DynamicLeadField({
       case 'select':
       case 'select_dependent':
         const options = getOptions()
+        const displayValue = getDisplayValue()
 
         return (
           <Select
-            value={value || ''}
+            value={displayValue}
             onValueChange={handleChange}
+            disabled={loading || (config.field_name === 'contact' && !dependentValues.account_id)}
           >
             <SelectTrigger className={error ? 'border-red-500' : ''}>
               <SelectValue
-                placeholder={config.placeholder || `Select ${config.field_label.toLowerCase()}`}
+                placeholder={
+                  loading
+                    ? 'Loading...'
+                    : config.field_name === 'contact' && !dependentValues.account_id
+                    ? 'Select account first'
+                    : config.placeholder || `Select ${config.field_label.toLowerCase()}`
+                }
               />
             </SelectTrigger>
             <SelectContent>
