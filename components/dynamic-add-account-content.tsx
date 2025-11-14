@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { DynamicAccountField } from "./dynamic-account-field"
+import { IndustrySubIndustryPairs } from "./industry-subindustry-pairs"
 
 interface FieldConfig {
   id: string
@@ -61,6 +62,7 @@ export function DynamicAddAccountContent() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const [industries, setIndustries] = useState<{ industry: string; subIndustry: string }[]>([])
 
   useEffect(() => {
     const user = localStorage.getItem('user')
@@ -172,7 +174,8 @@ export function DynamicAddAccountContent() {
         body: JSON.stringify({
           companyId: currentUser.company_id,
           userId: currentUser.id,
-          ...formData
+          ...formData,
+          industries: formData.account_type === 'Distributor' ? industries : []
         })
       })
 
@@ -191,6 +194,7 @@ export function DynamicAddAccountContent() {
               resetData[field.field_name] = ''
             })
           setFormData(resetData)
+          setIndustries([])
           setShowReview(false)
           setErrors({})
         } else {
@@ -341,6 +345,26 @@ export function DynamicAddAccountContent() {
                   </Card>
                 )
               })}
+
+              {/* Distributor Industries - Review */}
+              {formData.account_type === 'Distributor' && industries.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Distributor Industries</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {industries.map((pair, index) => (
+                        <div key={index} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                          <span className="font-medium text-gray-900">{pair.industry}</span>
+                          <span className="text-gray-500">→</span>
+                          <span className="text-gray-700">{pair.subIndustry}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </ScrollArea>
 
@@ -448,6 +472,24 @@ export function DynamicAddAccountContent() {
                 </Card>
               )
             })}
+
+            {/* Distributor Industries - Only show if account_type is Distributor */}
+            {formData.account_type === 'Distributor' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Distributor Industries</CardTitle>
+                  <CardDescription>
+                    <span className="text-red-600">* Required - Select all industries this distributor operates in</span>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <IndustrySubIndustryPairs
+                    value={industries}
+                    onChange={setIndustries}
+                  />
+                </CardContent>
+              </Card>
+            )}
           </div>
         </ScrollArea>
 

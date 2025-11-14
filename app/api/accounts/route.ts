@@ -116,11 +116,16 @@ export async function POST(request: NextRequest) {
     // Only include fields that are enabled in the configuration
     const cleanedAccountData: any = {}
     Object.keys(accountData).forEach(key => {
-      // Only process fields that are in the enabled configuration
-      if (enabledFieldNames.has(key)) {
+      // Always include 'industries' field for distributor accounts (JSONB field, not in field configs)
+      // Only process fields that are in the enabled configuration OR special fields like 'industries'
+      if (enabledFieldNames.has(key) || key === 'industries') {
         const value = accountData[key]
+        // For industries field, keep array as-is (even if empty)
+        if (key === 'industries') {
+          cleanedAccountData[key] = Array.isArray(value) ? value : []
+        }
         // Convert empty strings to null, keep other values as-is
-        if (value === '' || value === undefined) {
+        else if (value === '' || value === undefined) {
           cleanedAccountData[key] = null
         } else if (typeof value === 'string' && value.trim() === '') {
           cleanedAccountData[key] = null
@@ -218,14 +223,19 @@ export async function PUT(request: NextRequest) {
     // Clean the update data - convert empty strings to null
     const cleanedUpdates: any = {}
     Object.keys(updates).forEach(key => {
-      // If we have field configurations, only process enabled fields
-      if (enabledFieldNames && !enabledFieldNames.has(key)) {
+      // Always include 'industries' field for distributor accounts (JSONB field, not in field configs)
+      // If we have field configurations, only process enabled fields OR special fields like 'industries'
+      if (enabledFieldNames && !enabledFieldNames.has(key) && key !== 'industries') {
         return // Skip this field if it's not enabled
       }
 
       const value = updates[key]
+      // For industries field, keep array as-is (even if empty)
+      if (key === 'industries') {
+        cleanedUpdates[key] = Array.isArray(value) ? value : []
+      }
       // Convert empty strings to null, keep other values as-is
-      if (value === '' || value === undefined) {
+      else if (value === '' || value === undefined) {
         cleanedUpdates[key] = null
       } else if (typeof value === 'string' && value.trim() === '') {
         cleanedUpdates[key] = null
