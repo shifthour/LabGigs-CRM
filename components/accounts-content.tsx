@@ -564,7 +564,6 @@ export function AccountsContent() {
           { key: 'email', label: 'Email', width: 25 },
           { key: 'website', label: 'Website', width: 25 },
           { key: 'address', label: 'Address', width: 30 },
-          { key: 'assignedTo', label: 'Assigned To', width: 15 },
           { key: 'status', label: 'Status', width: 12 },
           { key: 'createdAt', label: 'Created Date', width: 15 }
         ]
@@ -931,13 +930,8 @@ export function AccountsContent() {
                       </div>
                     </div>
 
-                    {/* Right section - Assigned to and actions */}
+                    {/* Right section - actions */}
                     <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <p className="text-sm text-gray-500">
-                          Assigned to: <span className="font-medium text-gray-900">{account.assignedTo || "Unassigned"}</span>
-                        </p>
-                      </div>
                       <div className="flex space-x-1">
                         {/* Communication Buttons */}
                         {account.contactNo && (
