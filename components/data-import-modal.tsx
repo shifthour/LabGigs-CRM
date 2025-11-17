@@ -98,7 +98,9 @@ export function DataImportModal({ isOpen, onClose, moduleType, onImport }: DataI
         { key: "state", label: "State", required: false },
         { key: "country", label: "Country", required: false },
         { key: "website", label: "Website", required: false },
-        { key: "notes", label: "Notes", required: false }
+        { key: "notes", label: "Notes", required: false },
+        { key: "productNames", label: "Product Names (comma-separated)", required: false },
+        { key: "productQuantities", label: "Product Quantities (comma-separated)", required: false }
       ]
     },
     accounts: {
@@ -484,6 +486,7 @@ export function DataImportModal({ isOpen, onClose, moduleType, onImport }: DataI
   const downloadTemplate = () => {
     const headers = currentConfig.fields.map(field => field.label)
     const csvContent = headers.join(',') + '\n'
+    console.log('Template headers:', headers) // Debug log
     
     // Add sample row
     const sampleRow = currentConfig.fields.map(field => {
@@ -519,6 +522,10 @@ export function DataImportModal({ isOpen, onClose, moduleType, onImport }: DataI
         case 'salesStage':
         case 'stage':
           return 'Qualified'
+        case 'productNames':
+          return 'Headphones, Mouse, Keyboard'
+        case 'productQuantities':
+          return '2, 5, 3'
         default:
           return 'Sample Value'
       }

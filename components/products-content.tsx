@@ -77,14 +77,29 @@ export function ProductsContent() {
           id: product.id,
           branch: product.branch || '',
           category: product.category || '',
+          subCategory: product.sub_category || '',
           principal: product.principal || '',
           productName: product.product_name,
+          productCode: product.product_code || '',
           refNo: product.product_reference_no || '',
           assignedTo: product.assigned_to || 'Hari Kumar K, Prashanth Sandily',
           status: product.status || 'Active',
-          price: `₹${product.price?.toLocaleString() || '0'}`,
-          description: product.description || '',
+          productStatus: product.product_status || '',
+          price: product.price ? `₹${product.price.toLocaleString()}` : null,
+          basePrice: product.base_price || null,
+          costPrice: product.cost_price || null,
+          profitMargin: product.profit_margin || null,
+          currency: product.currency || 'INR',
+          description: product.description || product.product_description || '',
+          shortDescription: product.short_description || '',
+          productTags: product.product_tags || '',
+          inventoryType: product.inventory_type || '',
+          currentStockLevel: product.current_stock_level || '',
+          reorderPoint: product.reorder_point || '',
+          technicalSpecifications: product.technical_specifications || '',
+          dataClassification: product.data_classification || '',
           product_picture: product.product_picture || null,
+          primaryImageUrl: product.primary_image_url || null,
         }
       })
       
@@ -205,21 +220,43 @@ export function ProductsContent() {
       // Prepare products for import - flexible field mapping
       const productsToImport = data.map(item => {
         // Try multiple possible field names for product name
-        const productName = item.product_name || item['Product Name'] || item.productName || 
+        const productName = item.product_name || item['Product Name'] || item.productName ||
                            item['Product name'] || item.name || item.Name || ''
-        
+
+        // Helper to parse numeric values
+        const parseNum = (value: any) => {
+          const parsed = parseFloat(value)
+          return isNaN(parsed) ? null : parsed
+        }
+
         return {
           product_name: productName,
-          product_reference_no: item.product_reference_no || item['Product Reference No/ID'] || item.productReferenceNo || 
+          product_reference_no: item.product_reference_no || item['Product Reference No/ID'] || item.productReferenceNo ||
                                item.refNo || item['Ref No'] || item.reference_no || '',
+          product_code: item.product_code || item['Product Code'] || item.productCode || item.code || item.Code || '',
           description: item.description || item.Description || item['Product Description'] || '',
+          product_description: item.product_description || item['Product Description'] || item.description || '',
+          short_description: item.short_description || item['Short Description'] || item.shortDescription || '',
           principal: item.principal || item.Principal || item['Principal Company'] || '',
-          category: item.category || item.Category || '',
-          sub_category: item.sub_category || item['Sub Category'] || item.subCategory || '',
-          price: parseFloat(item.price || item.Price || item['Product Price'] || '0'),
+          category: item.category || item.Category || item['Product Category'] || '',
+          sub_category: item.sub_category || item['Sub Category'] || item.subCategory || item.subcategory || '',
+          price: parseNum(item.price || item.Price || item['Product Price']),
+          base_price: parseNum(item.base_price || item['Base Price'] || item.basePrice),
+          cost_price: parseNum(item.cost_price || item['Cost Price'] || item.costPrice),
+          profit_margin: parseNum(item.profit_margin || item['Profit Margin'] || item.profitMargin),
+          currency: item.currency || item.Currency || 'INR',
           branch: item.branch || item.Branch || item['Branch/Division'] || '',
           status: item.status || item.Status || 'Active',
+          product_status: item.product_status || item['Product Status'] || item.productStatus || '',
           assigned_to: item.assigned_to || item['Assigned To'] || item.assignedTo || 'Hari Kumar K, Prashanth Sandily',
+          inventory_type: item.inventory_type || item['Inventory Type'] || item.inventoryType || '',
+          current_stock_level: parseNum(item.current_stock_level || item['Current Stock Level'] || item.currentStockLevel || item.stock),
+          reorder_point: parseNum(item.reorder_point || item['Reorder Point'] || item.reorderPoint),
+          technical_specifications: item.technical_specifications || item['Technical Specifications'] ||
+                                   item.technicalSpecifications || item.tech_specs || item['Tech Specs'] || '',
+          data_classification: item.data_classification || item['Data Classification'] ||
+                              item.dataClassification || item.classification || '',
+          product_tags: item.product_tags || item['Product Tags'] || item.productTags || item.tags || '',
           image_file_url: item.image_file_url || item['Image File URL'] || item.imageFileUrl || item['Image URL'] || '',
           company_id: user.company_id
         }
@@ -227,7 +264,8 @@ export function ProductsContent() {
       
       let successCount = 0
       let failCount = 0
-      
+      const errors: string[] = []
+
       console.log("Processed products for import:", productsToImport.length)
       
       // Load existing products once for duplicate checking
@@ -246,13 +284,17 @@ export function ProductsContent() {
       // Import products one by one with progress updates
       for (let i = 0; i < productsToImport.length; i++) {
         const product = productsToImport[i]
-        
+
         // Update progress
         setImportProgress({ current: i + 1, total: productsToImport.length })
-        
+
+        const rowNumber = i + 2 // Excel row number (accounting for header)
+        const productIdentifier = product.product_name || `Row ${rowNumber}`
+
         if (!product.product_name || product.product_name.trim() === '') {
-          console.log(`Skipping row ${i + 2} with no product name:`, product)
+          console.log(`Skipping row ${rowNumber} with no product name:`, product)
           failCount++
+          errors.push(`Row ${rowNumber}: Missing required field (Product Name)`)
           continue
         }
 
@@ -272,6 +314,7 @@ export function ProductsContent() {
         if (isDuplicate) {
           console.log(`Skipping duplicate product: ${product.product_name} (Ref: ${product.product_reference_no})`)
           failCount++
+          errors.push(`Row ${rowNumber} (${productIdentifier}): Duplicate product - already exists`)
           continue
         }
         
@@ -311,7 +354,7 @@ export function ProductsContent() {
           if (response.ok) {
             successCount++
             console.log(`Successfully imported product: ${product.product_name}`)
-            
+
             // Add to existing products list to prevent duplicates within this import batch
             existingProducts.push({
               productName: product.product_name,
@@ -321,14 +364,24 @@ export function ProductsContent() {
             const errorData = await response.text()
             console.error(`Failed to import product ${product.product_name}:`, errorData)
             failCount++
+
+            // Try to parse error message from API response
+            try {
+              const errorJson = JSON.parse(errorData)
+              const errorMessage = errorJson.message || errorJson.error || 'API error'
+              errors.push(`Row ${rowNumber} (${productIdentifier}): ${errorMessage}`)
+            } catch {
+              errors.push(`Row ${rowNumber} (${productIdentifier}): Failed to import - ${errorData.substring(0, 100)}`)
+            }
           }
-          
+
           // Small delay to prevent overwhelming the server
           await new Promise(resolve => setTimeout(resolve, 100))
-          
+
         } catch (error) {
           console.error(`Error importing product ${product.product_name}:`, error)
           failCount++
+          errors.push(`Row ${rowNumber} (${productIdentifier}): Failed to import - ${error instanceof Error ? error.message : 'Unknown error'}`)
         }
       }
       
@@ -336,12 +389,35 @@ export function ProductsContent() {
       setIsImporting(false)
       setImportProgress({ current: 0, total: 0 })
       setIsDataImportModalOpen(false)
-      
-      toast({
-        title: "Import completed",
-        description: `Successfully imported ${successCount} of ${data.length} products. ${failCount > 0 ? `${failCount} skipped/failed (duplicates or errors).` : ''}`
-      })
-      
+
+      // Show detailed error messages
+      console.log('Import completed. Success:', successCount, 'Failed:', failCount, 'Errors:', errors)
+
+      if (errors.length > 0) {
+        // Create a more readable error message
+        const errorList = errors.slice(0, 3).map((err, idx) => `${idx + 1}. ${err}`).join(' | ')
+        const moreErrors = errors.length > 3 ? ` (${errors.length - 3} more errors)` : ''
+
+        toast({
+          title: failCount === data.length ? "Import failed" : "Import completed with errors",
+          description: `Success: ${successCount}/${data.length} | Failed: ${failCount}. ${errorList}${moreErrors}`,
+          variant: failCount === data.length ? "destructive" : "default",
+          duration: 15000 // Show for 15 seconds so user can read errors
+        })
+
+        // Also log all errors to console for debugging
+        console.log('=== IMPORT ERRORS ===')
+        errors.forEach((err, idx) => {
+          console.log(`${idx + 1}. ${err}`)
+        })
+        console.log('=====================')
+      } else {
+        toast({
+          title: "Import completed",
+          description: `Successfully imported ${successCount}/${data.length} products.`
+        })
+      }
+
       // Reload products to show the imported ones
       await loadProducts()
       
@@ -727,86 +803,166 @@ export function ProductsContent() {
                     
                       {/* Product Details */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2 mb-2">
+                        {/* Product Name and Status */}
+                        <div className="flex items-center space-x-2 mb-3">
                           <h3 className="font-semibold text-lg truncate">{product.productName}</h3>
                           <Badge className={getStatusColor(product.status)}>
                             {product.status}
                           </Badge>
                         </div>
-                        
-                        {/* Principal */}
-                        {product.principal && (
-                          <div className="flex items-center space-x-2 mb-2">
-                            <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full font-medium">
-                              Principal: {product.principal}
-                            </span>
-                          </div>
-                        )}
-                        
-                        {/* Category */}
-                        {product.category && (
-                          <div className="flex items-center space-x-2 mb-2">
-                            <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full font-medium">
-                              Category: {product.category}
-                            </span>
-                          </div>
-                        )}
-                        
-                        {/* Description - Expandable */}
-                        {product.description && (
-                          <div className="mb-2">
-                            <div 
-                              className="text-sm text-gray-600"
-                              style={expandedDescriptions.has(product.id) ? {} : {
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden'
-                              }}
-                            >
-                              {product.description}
-                            </div>
-                            {product.description.length > 150 && (
-                              <button
-                                onClick={() => toggleDescription(product.id)}
-                                className="text-blue-600 hover:text-blue-800 text-sm font-medium mt-1 flex items-center transition-colors"
-                              >
-                                {expandedDescriptions.has(product.id) ? (
-                                  <>
-                                    <ChevronUp className="w-4 h-4 mr-1" />
-                                    Show less
-                                  </>
-                                ) : (
-                                  <>
-                                    <ChevronDown className="w-4 h-4 mr-1" />
-                                    Show more
-                                  </>
-                                )}
-                              </button>
+
+                        {/* Grid Layout for Product Details */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
+                          {/* Column 1 */}
+                          <div className="space-y-1">
+                            {/* Product Code and Reference Number */}
+                            {product.productCode && (
+                              <div className="flex items-center space-x-1">
+                                <Grid3X3 className="w-4 h-4 text-gray-500" />
+                                <span className="text-sm text-gray-600 font-medium">
+                                  Code: {product.productCode}
+                                </span>
+                              </div>
+                            )}
+                            {product.refNo && (
+                              <div className="flex items-center space-x-1">
+                                <Grid3X3 className="w-4 h-4 text-gray-500" />
+                                <span className="text-sm text-gray-600 font-medium">
+                                  Ref: {product.refNo}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Category and Sub-Category */}
+                            {product.category && (
+                              <div>
+                                <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full font-medium">
+                                  {product.category}
+                                </span>
+                              </div>
+                            )}
+                            {product.subCategory && (
+                              <div>
+                                <span className="px-2 py-1 text-xs bg-green-50 text-green-700 rounded-full font-medium">
+                                  {product.subCategory}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Description inline */}
+                            {product.description && (
+                              <div className="text-sm text-gray-600">
+                                <span className="font-semibold">Desc: </span>
+                                <span className="line-clamp-2">{product.description}</span>
+                              </div>
                             )}
                           </div>
-                        )}
-                        
-                        {/* Price */}
-                        <div>
-                          <span className="text-lg font-bold text-green-600">
-                            {product.price}
-                          </span>
+
+                          {/* Column 2 */}
+                          <div className="space-y-1">
+                            {/* Branch and Principal */}
+                            {product.branch && (
+                              <div>
+                                <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full font-medium">
+                                  Branch: {product.branch}
+                                </span>
+                              </div>
+                            )}
+                            {product.principal && (
+                              <div>
+                                <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full font-medium">
+                                  Principal: {product.principal}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Inventory Type - with label */}
+                            {product.inventoryType && (
+                              <div className="text-sm text-gray-600">
+                                <span className="font-medium">Inventory: </span>
+                                <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full font-medium">
+                                  {product.inventoryType}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Data Classification - with label */}
+                            {product.dataClassification && (
+                              <div className="text-sm text-gray-600">
+                                <span className="font-medium">Classification: </span>
+                                <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-800 rounded-full font-medium">
+                                  {product.dataClassification}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Column 3 */}
+                          <div className="space-y-1">
+                            {/* Pricing Information */}
+                            {product.price && (
+                              <div className="flex items-center space-x-1">
+                                <IndianRupee className="w-4 h-4 text-green-600" />
+                                <span className="text-base font-bold text-green-600">
+                                  {product.price}
+                                </span>
+                              </div>
+                            )}
+                            {product.basePrice && (
+                              <div className="text-sm text-gray-600">
+                                <span className="font-medium">Base: </span>
+                                <span>₹{product.basePrice}</span>
+                              </div>
+                            )}
+                            {product.costPrice && (
+                              <div className="text-sm text-gray-600">
+                                <span className="font-medium">Cost: </span>
+                                <span>₹{product.costPrice}</span>
+                              </div>
+                            )}
+                            {product.profitMargin && (
+                              <div className="text-sm text-green-600 font-medium">
+                                Margin: {product.profitMargin}%
+                              </div>
+                            )}
+
+                            {/* Stock Information */}
+                            {product.currentStockLevel && (
+                              <div className="text-sm text-gray-600">
+                                <span className="font-medium">Stock: </span>
+                                <span>{product.currentStockLevel} units</span>
+                              </div>
+                            )}
+                            {product.reorderPoint && (
+                              <div className="text-sm text-gray-600">
+                                <span className="font-medium">Reorder: </span>
+                                <span>{product.reorderPoint} units</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
+
+                        {/* Full-width items below the grid */}
+                        {product.productTags && (
+                          <div className="mt-1">
+                            <span className="text-xs text-gray-500">Tags: </span>
+                            <span className="text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                              {product.productTags}
+                            </span>
+                          </div>
+                        )}
+
+                        {product.technicalSpecifications && (
+                          <div className="mt-1">
+                            <span className="text-xs font-semibold text-gray-700">Tech Specs: </span>
+                            <span className="text-xs text-gray-600">{product.technicalSpecifications}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
                   {/* Actions */}
                   <div className="flex flex-col items-end space-y-2 pt-2">
-                    {/* Assigned To */}
-                    {product.assignedTo && (
-                      <div className="text-right">
-                        <span className="text-xs text-gray-600 font-medium">
-                          Assigned to: {product.assignedTo}
-                        </span>
-                      </div>
-                    )}
-
                     <div className="flex space-x-2">
                       <Button variant="outline" size="sm" onClick={() => handleEditProduct(product)}>
                         <Edit className="w-4 h-4 mr-1" />

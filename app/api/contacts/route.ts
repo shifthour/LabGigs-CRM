@@ -44,14 +44,23 @@ export async function GET(request: NextRequest) {
             .eq('id', contact.account_id)
             .single()
 
+          console.log(`Contact ${contact.first_name} ${contact.last_name} - Account data:`, {
+            account_id: contact.account_id,
+            acct_industry: accountData?.acct_industry,
+            acct_sub_industry: accountData?.acct_sub_industry
+          })
+
           return {
             ...contact,
             account: accountData
           }
         }
+        console.log(`Contact ${contact.first_name} ${contact.last_name} - No account_id`)
         return contact
       })
     )
+
+    console.log(`Returning ${contactsWithAccounts.length} contacts with account data`)
 
     return NextResponse.json({
       contacts: contactsWithAccounts || [],
@@ -140,10 +149,9 @@ export async function POST(request: NextRequest) {
       ...cleanedContactData
     }
 
-    // Only add account_id if that field is enabled
-    if (enabledFieldNames.has('account_id')) {
-      insertData.account_id = accountId || null
-    }
+    // Always add account_id when provided (system field, not user-configurable)
+    insertData.account_id = accountId || null
+
     // Only add owner_id if that field is enabled
     if (enabledFieldNames.has('owner_id')) {
       insertData.owner_id = userId || null
@@ -167,6 +175,23 @@ export async function POST(request: NextRequest) {
       console.error('Error creating contact:', error)
       console.error('Error details:', JSON.stringify(error, null, 2))
       console.error('Insert data:', JSON.stringify(insertData, null, 2))
+
+      // Check for duplicate email error
+      if (error.code === '23505' && error.message.includes('contacts_email_company_unique')) {
+        const email = insertData.email_primary || 'this email'
+        return NextResponse.json({
+          error: `Email already exists`,
+          message: `A contact with the email "${email}" already exists in your system. Please use a different email address.`
+        }, { status: 400 })
+      }
+
+      // Check for other unique constraint violations
+      if (error.code === '23505') {
+        return NextResponse.json({
+          error: 'Duplicate entry',
+          message: 'A contact with this information already exists. Please check and try again.'
+        }, { status: 400 })
+      }
 
       return NextResponse.json({
         error: error.message || 'Failed to create contact',
@@ -246,10 +271,9 @@ export async function PUT(request: NextRequest) {
       ...cleanedContactData
     }
 
-    // Only add account_id if field is enabled
-    if (!enabledFieldNames || enabledFieldNames.has('account_id')) {
-      updateData.account_id = accountId || null
-    }
+    // Always add account_id when provided (system field, not user-configurable)
+    updateData.account_id = accountId || null
+
     // Only add company_name if field is enabled
     if ((!enabledFieldNames || enabledFieldNames.has('company_name')) && companyName) {
       updateData.company_name = companyName
@@ -266,6 +290,23 @@ export async function PUT(request: NextRequest) {
       console.error('Error updating contact:', error)
       console.error('Error details:', JSON.stringify(error, null, 2))
       console.error('Update data:', JSON.stringify(updateData, null, 2))
+
+      // Check for duplicate email error
+      if (error.code === '23505' && error.message.includes('contacts_email_company_unique')) {
+        const email = updateData.email_primary || 'this email'
+        return NextResponse.json({
+          error: `Email already exists`,
+          message: `A contact with the email "${email}" already exists in your system. Please use a different email address.`
+        }, { status: 400 })
+      }
+
+      // Check for other unique constraint violations
+      if (error.code === '23505') {
+        return NextResponse.json({
+          error: 'Duplicate entry',
+          message: 'A contact with this information already exists. Please check and try again.'
+        }, { status: 400 })
+      }
 
       return NextResponse.json({
         error: error.message || 'Failed to update contact',

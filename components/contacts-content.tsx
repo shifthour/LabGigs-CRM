@@ -231,23 +231,65 @@ export function ContactsContent() {
 
       let successCount = 0
       let failCount = 0
+      const errors: string[] = []
 
       for (let i = 0; i < data.length; i++) {
         const item = data[i]
         setImportProgress({ current: i + 1, total: data.length })
 
-        // Data comes already mapped from field_name
-        const contactData = {
-          ...item,
-          company_id: companyId
-        }
+        const rowNumber = i + 2 // Excel row number (accounting for header)
+        const contactIdentifier = item.first_name || item.email_primary || `Row ${rowNumber}`
 
         // Validate required fields (assuming first_name and email_primary are required)
-        if (!contactData.first_name || !contactData.email_primary) {
-          console.log(`Skipping row ${i + 2} - missing required fields`)
+        if (!item.first_name || !item.email_primary) {
+          console.log(`Skipping row ${rowNumber} - missing required fields`)
           failCount++
+          errors.push(`Row ${rowNumber} (${contactIdentifier}): Missing required fields (First Name or Email)`)
           continue
         }
+
+        // If company_name is provided, look up the account_id
+        let accountId = null
+        if (item.company_name) {
+          try {
+            const accountResponse = await fetch(`/api/accounts?companyId=${companyId}&limit=1000`)
+            if (accountResponse.ok) {
+              const accountsData = await accountResponse.json()
+              const matchingAccount = accountsData.accounts?.find(
+                (acc: any) => acc.account_name?.toLowerCase() === item.company_name.toLowerCase()
+              )
+
+              if (matchingAccount) {
+                accountId = matchingAccount.id
+                console.log(`Found account "${item.company_name}" with ID: ${accountId}`)
+              } else {
+                failCount++
+                errors.push(`Row ${rowNumber} (${contactIdentifier}): Account "${item.company_name}" not found. Please create the account first or check the spelling.`)
+                continue
+              }
+            }
+          } catch (error) {
+            console.error('Error looking up account:', error)
+            failCount++
+            errors.push(`Row ${rowNumber} (${contactIdentifier}): Failed to lookup account "${item.company_name}"`)
+            continue
+          }
+        }
+
+        // Build contact data with account_id if found
+        const contactData = {
+          ...item,
+          companyId: companyId, // API expects 'companyId' not 'company_id'
+          userId: parsedUser.id,
+          accountId: accountId // This will be passed to the API
+        }
+
+        console.log(`Importing contact for row ${rowNumber}:`, {
+          name: `${item.first_name} ${item.last_name}`,
+          email: item.email_primary,
+          company_name: item.company_name,
+          accountId: accountId
+        })
 
         try {
           const response = await fetch('/api/contacts', {
@@ -261,16 +303,23 @@ export function ContactsContent() {
           if (response.ok) {
             successCount++
           } else {
-            const errorText = await response.text()
-            if (response.status === 400 && errorText.includes('already exists')) {
-              successCount++ // Consider duplicate as success
+            const errorData = await response.json()
+            const errorMessage = errorData.message || errorData.error || 'Unknown error'
+
+            if (response.status === 400 && errorMessage.toLowerCase().includes('already exists')) {
+              // For duplicate emails, show as warning but don't fail
+              errors.push(`Row ${rowNumber} (${contactData.email_primary}): Email already exists - skipped`)
+              failCount++
             } else {
               failCount++
+              errors.push(`Row ${rowNumber} (${contactIdentifier}): ${errorMessage}`)
             }
+            console.error(`Error importing row ${rowNumber}:`, errorData)
           }
         } catch (error) {
           console.error('Error importing contact:', error)
           failCount++
+          errors.push(`Row ${rowNumber} (${contactIdentifier}): Failed to import - ${error instanceof Error ? error.message : 'Unknown error'}`)
         }
 
         await new Promise(resolve => setTimeout(resolve, 50))
@@ -284,10 +333,33 @@ export function ContactsContent() {
       setImportProgress({ current: 0, total: 0 })
       setIsImportModalOpen(false)
 
-      toast({
-        title: "Import completed",
-        description: `Processed ${successCount}/${data.length} contacts successfully. ${failCount > 0 ? `Skipped: ${failCount}` : ''}`
-      })
+      // Show detailed error messages
+      console.log('Import completed. Success:', successCount, 'Failed:', failCount, 'Errors:', errors)
+
+      if (errors.length > 0) {
+        // Create a more readable error message
+        const errorList = errors.slice(0, 3).map((err, idx) => `${idx + 1}. ${err}`).join(' | ')
+        const moreErrors = errors.length > 3 ? ` (${errors.length - 3} more errors)` : ''
+
+        toast({
+          title: failCount === data.length ? "Import failed" : "Import completed with errors",
+          description: `Success: ${successCount}/${data.length} | Failed: ${failCount}. ${errorList}${moreErrors}`,
+          variant: failCount === data.length ? "destructive" : "default",
+          duration: 15000 // Show for 15 seconds so user can read errors
+        })
+
+        // Also log all errors to console for debugging
+        console.log('=== IMPORT ERRORS ===')
+        errors.forEach((err, idx) => {
+          console.log(`${idx + 1}. ${err}`)
+        })
+        console.log('=====================')
+      } else {
+        toast({
+          title: "Import completed",
+          description: `Successfully imported ${successCount}/${data.length} contacts.`
+        })
+      }
 
     } catch (error) {
       console.error('Import error:', error)

@@ -17,8 +17,14 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching AMC contracts:', error)
+      console.error('Full error details:', JSON.stringify(error, null, 2))
       return NextResponse.json(
-        { error: 'Failed to fetch AMC contracts' },
+        {
+          error: 'Failed to fetch AMC contracts',
+          details: error.message || error.toString(),
+          hint: error.hint || '',
+          code: error.code || ''
+        },
         { status: 500 }
       )
     }
@@ -26,8 +32,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ amcContracts })
   } catch (error) {
     console.error('Unexpected error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        error: 'Internal server error',
+        details: errorMessage
+      },
       { status: 500 }
     )
   }
@@ -40,17 +50,25 @@ export async function POST(request: NextRequest) {
     console.log('=== AMC API RECEIVED ===')
     console.log('service_frequency:', body.service_frequency)
     console.log('Full body keys:', Object.keys(body))
-    
+    console.log('Full body data:', JSON.stringify(body, null, 2))
+
     const companyId = body.companyId || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
 
+    // Remove companyId from body before spreading (database uses company_id)
+    const { companyId: _, start_date, end_date, ...bodyWithoutCompanyId } = body
+
     const amcData = {
-      ...body,
+      ...bodyWithoutCompanyId,
       company_id: companyId,
+      // Map form field names to database column names
+      contract_start_date: start_date || null,
+      contract_end_date: end_date || null,
       created_by: 'f41e509a-4c92-4baa-bca2-ab1d3410e465',
       updated_by: 'f41e509a-4c92-4baa-bca2-ab1d3410e465'
     }
-    
+
     console.log('AMC data service_frequency before insert:', amcData.service_frequency)
+    console.log('AMC data being inserted:', JSON.stringify(amcData, null, 2))
 
     const { data: amcContract, error } = await supabase
       .from('amc_contracts')
@@ -60,8 +78,14 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating AMC contract:', error)
+      console.error('Full error details:', JSON.stringify(error, null, 2))
       return NextResponse.json(
-        { error: 'Failed to create AMC contract' },
+        {
+          error: 'Failed to create AMC contract',
+          details: error.message || error.toString(),
+          hint: error.hint || '',
+          code: error.code || ''
+        },
         { status: 500 }
       )
     }
@@ -69,8 +93,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ amcContract })
   } catch (error) {
     console.error('Unexpected error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        error: 'Internal server error',
+        details: errorMessage
+      },
       { status: 500 }
     )
   }
@@ -95,8 +123,14 @@ export async function PUT(request: NextRequest) {
 
     if (error) {
       console.error('Error updating AMC contract:', error)
+      console.error('Full error details:', JSON.stringify(error, null, 2))
       return NextResponse.json(
-        { error: 'Failed to update AMC contract' },
+        {
+          error: 'Failed to update AMC contract',
+          details: error.message || error.toString(),
+          hint: error.hint || '',
+          code: error.code || ''
+        },
         { status: 500 }
       )
     }
@@ -104,8 +138,12 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ amcContract })
   } catch (error) {
     console.error('Unexpected error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        error: 'Internal server error',
+        details: errorMessage
+      },
       { status: 500 }
     )
   }
@@ -130,8 +168,14 @@ export async function DELETE(request: NextRequest) {
 
     if (error) {
       console.error('Error deleting AMC contract:', error)
+      console.error('Full error details:', JSON.stringify(error, null, 2))
       return NextResponse.json(
-        { error: 'Failed to delete AMC contract' },
+        {
+          error: 'Failed to delete AMC contract',
+          details: error.message || error.toString(),
+          hint: error.hint || '',
+          code: error.code || ''
+        },
         { status: 500 }
       )
     }
@@ -139,8 +183,12 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Unexpected error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        error: 'Internal server error',
+        details: errorMessage
+      },
       { status: 500 }
     )
   }

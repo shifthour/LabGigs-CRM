@@ -5,6 +5,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
+import { Plus, X } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
 
 interface FieldConfig {
   field_name: string
@@ -25,6 +28,10 @@ interface DynamicFieldProps {
   error?: string
   // For dependent dropdowns like subindustry
   dependentValues?: Record<string, any>
+  // For multi-select industries (distributor)
+  onIndustriesChange?: (industries: { industry: string; subIndustry: string }[]) => void
+  industries?: { industry: string; subIndustry: string }[]
+  industriesError?: string
 }
 
 export function DynamicAccountField({
@@ -32,10 +39,16 @@ export function DynamicAccountField({
   value,
   onChange,
   error,
-  dependentValues = {}
+  dependentValues = {},
+  onIndustriesChange,
+  industries = [],
+  industriesError
 }: DynamicFieldProps) {
   const [subIndustries, setSubIndustries] = useState<string[]>([])
   const [loadingSubIndustries, setLoadingSubIndustries] = useState(false)
+  const [industrySubIndustriesMap, setIndustrySubIndustriesMap] = useState<Record<number, string[]>>({})
+
+  const isDistributor = dependentValues.account_type === 'Distributor' || dependentValues.accountType === 'Distributor'
 
   // Load sub-industries when industry changes
   useEffect(() => {
@@ -44,18 +57,73 @@ export function DynamicAccountField({
     }
   }, [dependentValues.acct_industry, config.field_name])
 
-  const loadSubIndustries = async (industry: string) => {
-    setLoadingSubIndustries(true)
-    try {
-      const response = await fetch(`/api/industries?industry=${encodeURIComponent(industry)}`)
-      if (response.ok) {
-        const data = await response.json()
-        setSubIndustries(data)
+  const loadSubIndustries = async (industry: string, pairIndex?: number) => {
+    if (pairIndex !== undefined) {
+      // Loading for a specific pair in multi-select
+      try {
+        const response = await fetch(`/api/industries?industry=${encodeURIComponent(industry)}`)
+        if (response.ok) {
+          const data = await response.json()
+          setIndustrySubIndustriesMap(prev => ({
+            ...prev,
+            [pairIndex]: data
+          }))
+        }
+      } catch (error) {
+        console.error('Error loading sub-industries:', error)
       }
-    } catch (error) {
-      console.error('Error loading sub-industries:', error)
-    } finally {
-      setLoadingSubIndustries(false)
+    } else {
+      // Loading for single select
+      setLoadingSubIndustries(true)
+      try {
+        const response = await fetch(`/api/industries?industry=${encodeURIComponent(industry)}`)
+        if (response.ok) {
+          const data = await response.json()
+          setSubIndustries(data)
+        }
+      } catch (error) {
+        console.error('Error loading sub-industries:', error)
+      } finally {
+        setLoadingSubIndustries(false)
+      }
+    }
+  }
+
+  // Multi-select industry handlers
+  const handleAddIndustryPair = () => {
+    if (onIndustriesChange) {
+      onIndustriesChange([...industries, { industry: '', subIndustry: '' }])
+    }
+  }
+
+  const handleRemoveIndustryPair = (index: number) => {
+    if (onIndustriesChange) {
+      const newIndustries = industries.filter((_, i) => i !== index)
+      onIndustriesChange(newIndustries)
+      // Clean up sub-industries map
+      const newMap = { ...industrySubIndustriesMap }
+      delete newMap[index]
+      setIndustrySubIndustriesMap(newMap)
+    }
+  }
+
+  const handleIndustryChange = (index: number, industry: string) => {
+    if (onIndustriesChange) {
+      const newIndustries = [...industries]
+      newIndustries[index] = { industry, subIndustry: '' }
+      onIndustriesChange(newIndustries)
+      // Load sub-industries for this industry
+      if (industry) {
+        loadSubIndustries(industry, index)
+      }
+    }
+  }
+
+  const handleSubIndustryChange = (index: number, subIndustry: string) => {
+    if (onIndustriesChange) {
+      const newIndustries = [...industries]
+      newIndustries[index] = { ...newIndustries[index], subIndustry }
+      onIndustriesChange(newIndustries)
     }
   }
 
@@ -171,6 +239,104 @@ export function DynamicAccountField({
 
   if (!config.is_enabled) {
     return null
+  }
+
+  // Hide acct_sub_industry if account_type is Distributor (it's included in the multi-select)
+  if (isDistributor && config.field_name === 'acct_sub_industry') {
+    return null
+  }
+
+  // Show multi-select Account Industry for distributors
+  if (config.field_name === 'acct_industry' && isDistributor && onIndustriesChange) {
+    return (
+      <div className="space-y-4 md:col-span-2">
+        <div>
+          <Label>
+            Account Industry
+            <span className="text-red-500 ml-1">*</span>
+          </Label>
+          <p className="text-xs text-gray-500 mt-1">Select all industries this distributor operates in</p>
+        </div>
+
+        <div className="space-y-3">
+          {industries.map((pair, index) => (
+            <Card key={index} className="border-blue-200">
+              <CardContent className="pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Industry {index + 1}</Label>
+                    <Select
+                      value={pair.industry}
+                      onValueChange={(value) => handleIndustryChange(index, value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select industry" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(config.field_options || []).map((option, optIndex) => (
+                          <SelectItem key={`industry-${index}-${optIndex}`} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Sub-Industry</Label>
+                    <div className="flex gap-2">
+                      <Select
+                        value={pair.subIndustry}
+                        onValueChange={(value) => handleSubIndustryChange(index, value)}
+                        disabled={!pair.industry}
+                      >
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={pair.industry ? "Select sub-industry" : "Select industry first"}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(industrySubIndustriesMap[index] || []).map((subInd, subIndex) => (
+                            <SelectItem key={`subindustry-${index}-${subIndex}`} value={subInd}>
+                              {subInd}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {industries.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleRemoveIndustryPair(index)}
+                          className="shrink-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleAddIndustryPair}
+          className="w-full"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add Another Industry
+        </Button>
+
+        {industriesError && (
+          <p className="text-xs text-red-500">{industriesError}</p>
+        )}
+      </div>
+    )
   }
 
   return (

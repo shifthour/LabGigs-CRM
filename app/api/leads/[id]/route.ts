@@ -39,6 +39,15 @@ export async function GET(
       leadResponse = { ...restLead, ...custom_fields }
     }
 
+    // Map database IDs to form field names for select_dependent compatibility
+    // The DynamicLeadField component expects IDs for select_dependent fields
+    if (leadResponse.account_id) {
+      leadResponse.account = leadResponse.account_id
+    }
+    if (leadResponse.contact_id) {
+      leadResponse.contact = leadResponse.contact_id
+    }
+
     return NextResponse.json(leadResponse)
   } catch (error) {
     console.error('Error in lead GET:', error)

@@ -12,6 +12,8 @@ interface Product {
   product_code?: string
   product_reference_no?: string
   price?: number
+  base_price?: number
+  cost_price?: number
 }
 
 interface SelectedProduct {
@@ -78,16 +80,21 @@ export function MultiProductSelector({
       // Add product to selection
       console.log('Product selected:', product)
       console.log('Price:', product.price)
+      console.log('Base Price:', product.base_price)
+      console.log('Cost Price:', product.cost_price)
       console.log('All product keys:', Object.keys(product))
+
+      // Use the first available price field: price, base_price, or cost_price
+      const productPrice = product.price || product.base_price || product.cost_price || 0
 
       const newProduct: SelectedProduct = {
         product_id: product.id,
         product_name: product.product_name,
         quantity: 1,
-        price_per_unit: product.price || 0,
+        price_per_unit: productPrice,
         notes: ''
       }
-      console.log('New product created:', newProduct)
+      console.log('New product created with price:', newProduct)
 
       const updated = [...selectedProducts, newProduct]
       setSelectedProducts(updated)
@@ -188,7 +195,7 @@ export function MultiProductSelector({
                             )}
                           </div>
                           <div className="text-xs text-gray-600 mt-1">
-                            Price: ₹{product.price || 0}
+                            Price: ₹{product.price || product.base_price || product.cost_price || 0}
                           </div>
                         </div>
 

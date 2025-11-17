@@ -28,6 +28,7 @@ import {
   Mail,
   Users,
   FileText,
+  Trash2,
 } from "lucide-react"
 import { AIPredictiveAnalytics } from "@/components/ai-predictive-analytics"
 import { AIInsightsPanel } from "@/components/ai-insights-panel"
@@ -212,18 +213,18 @@ export function OpportunitiesContent() {
         const data = await dealsResponse.json()
         const dealsArray = data.deals || []
         
-        // For each deal, fetch its products from deal_products table
+        // For each deal, fetch its products and contact details
         const dealsWithProducts = await Promise.all(
           dealsArray.map(async (deal: any) => {
             try {
               // Try to fetch deal products
               const productsResponse = await fetch(`/api/deals/${deal.id}/products`)
               let dealProducts = []
-              
+
               if (productsResponse.ok) {
                 dealProducts = await productsResponse.json()
               }
-              
+
               // If no products in junction table, use legacy single product
               if (dealProducts.length === 0 && deal.product) {
                 dealProducts = [{
@@ -233,9 +234,33 @@ export function OpportunitiesContent() {
                   total_amount: deal.value || 0
                 }]
               }
-              
-              return { 
-                ...deal, 
+
+              // Fetch contact details to get phone and email
+              let contactPhone = deal.phone || ''
+              let contactEmail = deal.email || ''
+
+              if (deal.contact_id) {
+                try {
+                  const contactResponse = await fetch(`/api/contacts?companyId=${deal.company_id}`)
+                  if (contactResponse.ok) {
+                    const contacts = await contactResponse.json()
+                    const allContacts = contacts.contacts || contacts || []
+                    const contactDetails = allContacts.find((c: any) => c.id === deal.contact_id)
+
+                    if (contactDetails) {
+                      contactPhone = deal.phone || contactDetails.phone_mobile || contactDetails.phone_work || ''
+                      contactEmail = deal.email || contactDetails.email_primary || contactDetails.email || ''
+                    }
+                  }
+                } catch (err) {
+                  console.error('Error fetching contact details for deal:', err)
+                }
+              }
+
+              return {
+                ...deal,
+                phone: contactPhone,
+                email: contactEmail,
                 dealProducts,
                 totalProducts: dealProducts.length,
                 calculatedValue: dealProducts.reduce((sum: number, p: any) => sum + (p.total_amount || 0), 0) || deal.value || 0
@@ -249,8 +274,8 @@ export function OpportunitiesContent() {
                 price_per_unit: deal.price_per_unit || (deal.value || 0),
                 total_amount: deal.value || 0
               }] : []
-              return { 
-                ...deal, 
+              return {
+                ...deal,
                 dealProducts: fallbackProducts,
                 totalProducts: fallbackProducts.length,
                 calculatedValue: deal.value || 0
@@ -260,6 +285,7 @@ export function OpportunitiesContent() {
         )
         
         console.log("loadDeals - API deals with products:", dealsWithProducts)
+        console.log("First deal phone/email check:", dealsWithProducts[0]?.phone, dealsWithProducts[0]?.email)
         setDeals(dealsWithProducts)
         
         if (accountsResponse.ok) {
@@ -495,18 +521,18 @@ export function OpportunitiesContent() {
         },
         body: JSON.stringify(quotationData)
       })
-      
+
       if (response.ok) {
         const data = await response.json()
         const newQuotation = data.quotation
-        
+
         toast({
           title: "Quotation created",
           description: `Quotation ${newQuotation.quote_number} has been successfully created from deal: ${dealForQuotation?.deal_name}`
         })
         setIsQuotationModalOpen(false)
         setDealForQuotation(null)
-        
+
         // Navigate to quotations page
         window.location.href = '/quotations'
       } else {
@@ -517,6 +543,39 @@ export function OpportunitiesContent() {
       toast({
         title: "Error",
         description: "Failed to create quotation from deal. Please try again.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleDeleteDeal = async (dealId: string, dealName: string) => {
+    if (!confirm(`Are you sure you want to delete deal "${dealName}"?`)) {
+      return
+    }
+
+    try {
+      const user = localStorage.getItem('user')
+      if (!user) return
+
+      const parsedUser = JSON.parse(user)
+      const response = await fetch(`/api/deals?id=${dealId}&companyId=${parsedUser.company_id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Deal deleted",
+          description: `Deal "${dealName}" has been successfully deleted`
+        })
+        loadDeals()
+      } else {
+        throw new Error('Failed to delete deal')
+      }
+    } catch (error) {
+      console.error("Failed to delete deal:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete deal. Please try again.",
         variant: "destructive"
       })
     }
@@ -676,10 +735,9 @@ export function OpportunitiesContent() {
                         {/* Account Details */}
                         <div>
                           <div className="flex items-center space-x-2">
-                            <h3 className="font-semibold">{deal.account_name}</h3>
                             <span
                               className={`px-2 py-1 text-xs rounded-full ${
-                                deal.status === "Active" ? "bg-green-100 text-green-800" : 
+                                deal.status === "Active" ? "bg-green-100 text-green-800" :
                                 deal.status === "Won" ? "bg-blue-100 text-blue-800" :
                                 deal.status === "Lost" ? "bg-red-100 text-red-800" :
                                 "bg-gray-100 text-gray-800"
@@ -688,15 +746,17 @@ export function OpportunitiesContent() {
                               {deal.status}
                             </span>
                           </div>
-                          {deal.department && deal.department !== "None" && (
-                            <p className="text-sm font-medium text-blue-600 mb-1">Department: {deal.department}</p>
+                          {deal.deal_name && (
+                            <p className="text-sm font-semibold text-gray-900 mt-1">
+                              {deal.deal_name}
+                            </p>
                           )}
-                          <p className="text-sm text-gray-600">
-                            {deal.city && deal.state ? `${deal.city}, ${deal.state}` : 
-                             deal.city ? deal.city : 
-                             deal.state ? deal.state : 
-                             'Location not specified'}
+                          <p className="text-sm text-gray-700 mt-1">
+                            <span className="font-medium">Account:</span> {deal.account_name}
                           </p>
+                          {deal.department && deal.department !== "None" && (
+                            <p className="text-sm text-gray-600">Department: {deal.department}</p>
+                          )}
                         </div>
                         
                         {/* Contact Details */}
@@ -718,17 +778,16 @@ export function OpportunitiesContent() {
                           </div>
                         </div>
                         
-                        {/* Product Details */}
-                        <div className="ml-10">
-                          <div className="flex items-start gap-x-10">
+                        {/* Product Details - beside contact */}
+                        <div className="ml-14">
+                          <div className="flex items-start gap-x-14">
                             {/* Smart Products Display */}
-                            <ProductsDisplay 
-                              dealProducts={deal.dealProducts} 
-                              totalValue={deal.calculatedValue || deal.value} 
+                            <ProductsDisplay
+                              dealProducts={deal.dealProducts}
+                              totalValue={deal.calculatedValue || deal.value}
                             />
                             <div className="text-xs text-gray-500">
                               <p>Stage: {deal.stage}</p>
-                              <p>Assigned to: {deal.assigned_to}</p>
                             </div>
                           </div>
                         </div>
@@ -738,8 +797,8 @@ export function OpportunitiesContent() {
                         {/* First Row - Communication Buttons */}
                         <div className="flex space-x-1">
                           {deal.phone && (
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="sm"
                               onClick={() => window.open(`tel:${deal.phone}`, '_blank')}
                               className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
@@ -749,8 +808,8 @@ export function OpportunitiesContent() {
                             </Button>
                           )}
                           {deal.whatsapp && (
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="sm"
                               onClick={() => {
                                 const message = encodeURIComponent(`Hi ${deal.contact_person},\n\nHope you are doing well!\n\nPlease find attached quotation for ${deal.product} for your reference.\n\nLet me know if you have any questions or need any clarifications.\n\nThanks & Regards`)
@@ -763,8 +822,8 @@ export function OpportunitiesContent() {
                             </Button>
                           )}
                           {deal.email && (
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="sm"
                               onClick={() => {
                                 setEmailDeal(deal)
@@ -792,7 +851,7 @@ export function OpportunitiesContent() {
                               <FileText className="w-4 h-4" />
                             </Button>
                           )}
-                          
+
                           {/* Edit Button */}
                           <Button
                             variant="ghost"

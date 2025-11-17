@@ -142,19 +142,43 @@ export function AMCContent() {
         // Reload the contracts list
         await loadAmcContracts()
       } else {
-        const error = await response.json()
-        console.error('Failed to create AMC:', error)
+        // Try to parse error response and extract detailed information
+        let errorMessage = "Failed to create AMC contract"
+        let errorDetails = ""
+
+        try {
+          const errorData = await response.json()
+          console.error('API Error Response:', errorData)
+
+          // Extract error message and details
+          if (errorData.error) {
+            errorMessage = errorData.error
+          }
+          if (errorData.details) {
+            errorDetails = errorData.details
+          }
+          if (errorData.hint) {
+            errorDetails += (errorDetails ? ' | ' : '') + errorData.hint
+          }
+        } catch (parseError) {
+          // If JSON parsing fails, try to get text
+          const errorText = await response.text()
+          console.error('API Error Text:', errorText)
+          errorMessage = errorText || errorMessage
+        }
+
         toast({
-          title: "Error",
-          description: error.error || "Failed to create AMC contract",
+          title: "Failed to create AMC",
+          description: errorDetails ? `${errorMessage}: ${errorDetails}` : errorMessage,
           variant: "destructive",
         })
       }
     } catch (error) {
       console.error('Error creating AMC:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
       toast({
         title: "Error",
-        description: "Failed to create AMC contract. Please try again.",
+        description: `Failed to create AMC contract: ${errorMessage}`,
         variant: "destructive",
       })
     }
@@ -182,19 +206,43 @@ export function AMCContent() {
         // Reload the contracts list
         await loadAmcContracts()
       } else {
-        const error = await response.json()
-        console.error('Failed to update AMC:', error)
+        // Try to parse error response and extract detailed information
+        let errorMessage = "Failed to update AMC contract"
+        let errorDetails = ""
+
+        try {
+          const errorData = await response.json()
+          console.error('API Error Response:', errorData)
+
+          // Extract error message and details
+          if (errorData.error) {
+            errorMessage = errorData.error
+          }
+          if (errorData.details) {
+            errorDetails = errorData.details
+          }
+          if (errorData.hint) {
+            errorDetails += (errorDetails ? ' | ' : '') + errorData.hint
+          }
+        } catch (parseError) {
+          // If JSON parsing fails, try to get text
+          const errorText = await response.text()
+          console.error('API Error Text:', errorText)
+          errorMessage = errorText || errorMessage
+        }
+
         toast({
-          title: "Error",
-          description: error.error || "Failed to update AMC contract",
+          title: "Failed to update AMC",
+          description: errorDetails ? `${errorMessage}: ${errorDetails}` : errorMessage,
           variant: "destructive",
         })
       }
     } catch (error) {
       console.error('Error updating AMC:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
       toast({
         title: "Error",
-        description: "Failed to update AMC contract. Please try again.",
+        description: `Failed to update AMC contract: ${errorMessage}`,
         variant: "destructive",
       })
     }
@@ -248,19 +296,43 @@ export function AMCContent() {
         setIsAddComplaintModalOpen(false)
         setSourceAMC(null)
       } else {
-        const error = await response.json()
-        console.error('Failed to create complaint:', error)
+        // Try to parse error response and extract detailed information
+        let errorMessage = "Failed to create complaint"
+        let errorDetails = ""
+
+        try {
+          const errorData = await response.json()
+          console.error('API Error Response:', errorData)
+
+          // Extract error message and details
+          if (errorData.error) {
+            errorMessage = errorData.error
+          }
+          if (errorData.details) {
+            errorDetails = errorData.details
+          }
+          if (errorData.hint) {
+            errorDetails += (errorDetails ? ' | ' : '') + errorData.hint
+          }
+        } catch (parseError) {
+          // If JSON parsing fails, try to get text
+          const errorText = await response.text()
+          console.error('API Error Text:', errorText)
+          errorMessage = errorText || errorMessage
+        }
+
         toast({
-          title: "Error",
-          description: error.error || "Failed to create complaint",
+          title: "Failed to create complaint",
+          description: errorDetails ? `${errorMessage}: ${errorDetails}` : errorMessage,
           variant: "destructive",
         })
       }
     } catch (error) {
       console.error('Error creating complaint:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
       toast({
         title: "Error",
-        description: "Failed to create complaint. Please try again.",
+        description: `Failed to create complaint: ${errorMessage}`,
         variant: "destructive",
       })
     }

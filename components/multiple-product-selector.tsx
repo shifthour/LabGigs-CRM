@@ -16,6 +16,8 @@ interface Product {
   productName: string
   category: string
   price: number
+  base_price?: number
+  cost_price?: number
 }
 
 interface SelectedProduct {
@@ -65,7 +67,9 @@ export function MultipleProductSelector({
           id: product.id,
           productName: product.product_name,
           category: product.category || 'General',
-          price: product.price || 0
+          price: product.price || product.base_price || product.cost_price || 0,
+          base_price: product.base_price,
+          cost_price: product.cost_price
         }))
         setProducts(formattedProducts)
       }

@@ -143,6 +143,35 @@ export function AccountsContent() {
       const mappedAccounts = (data.accounts || []).map((account: any) => {
         console.log('Full account data from API:', account)
 
+        // Handle industries for distributors
+        let industries = account.industries || []
+
+        // If distributor but industries array is empty, check if old-style data exists
+        if (account.account_type === 'Distributor' && industries.length === 0 && account.acct_industry) {
+          // Convert old-style comma-separated or single value to industries array
+          const industryStr = account.acct_industry || ''
+          const subIndustryStr = account.acct_sub_industry || ''
+
+          if (industryStr) {
+            // Check if comma-separated (multiple) or single value
+            const industryList = industryStr.includes(',')
+              ? industryStr.split(',').map((s: string) => s.trim()).filter((s: string) => s)
+              : [industryStr.trim()].filter((s: string) => s)
+
+            const subIndustryList = subIndustryStr.includes(',')
+              ? subIndustryStr.split(',').map((s: string) => s.trim()).filter((s: string) => s)
+              : [subIndustryStr.trim()].filter((s: string) => s)
+
+            // Create industry pairs
+            industries = industryList.map((ind: string, idx: number) => ({
+              industry: ind,
+              subIndustry: subIndustryList[idx] || subIndustryList[0] || ''
+            }))
+
+            console.log('Converted old-style distributor data to industries array:', industries)
+          }
+        }
+
         return {
           id: account.id,
           accountName: account.account_name,
@@ -163,7 +192,7 @@ export function AccountsContent() {
           accountType: account.account_type,
           accountIndustry: account.acct_industry,
           subIndustry: account.acct_sub_industry,
-          industries: account.industries || [],
+          industries: industries,
           primaryContactName: account.primary_contact_name || account.contact_name || ''
         }
       })
@@ -453,10 +482,72 @@ export function AccountsContent() {
       })
 
       // The data comes already mapped from field_name, so we can use it directly
-      const accountsToImport = data.map(item => ({
-        ...item,
-        owner_id: user.id
-      }))
+      const accountsToImport = data.map(item => {
+        // Check if this is a distributor
+        const isDistributor = item.account_type === 'Distributor' || item.accountType === 'Distributor'
+
+        // Start with the base item
+        const account: any = { owner_id: user.id }
+
+        // Copy all fields EXCEPT the industry fields (we'll handle them specially)
+        Object.keys(item).forEach(key => {
+          if (key !== 'acct_industry' && key !== 'accountIndustry' &&
+              key !== 'acct_sub_industry' && key !== 'subIndustry') {
+            account[key] = item[key]
+          }
+        })
+
+        // Handle industries based on account type
+        if (isDistributor) {
+          // For distributors: Convert comma-separated to industries array
+          const industriesStr = item.acct_industry || item.accountIndustry || ''
+          const subIndustriesStr = item.acct_sub_industry || item.subIndustry || ''
+
+          console.log('Processing distributor:', item.account_name, 'industries:', industriesStr, 'subIndustries:', subIndustriesStr)
+
+          if (industriesStr && subIndustriesStr) {
+            const industries = industriesStr.split(',').map((s: string) => s.trim()).filter((s: string) => s)
+            const subIndustries = subIndustriesStr.split(',').map((s: string) => s.trim()).filter((s: string) => s)
+
+            // Create industry-subindustry pairs
+            const industriesPairs = industries.map((industry: string, index: number) => ({
+              industry,
+              subIndustry: subIndustries[index] || subIndustries[0] || ''
+            }))
+
+            account.industries = industriesPairs
+            console.log('Created industries pairs for distributor:', industriesPairs)
+          } else {
+            account.industries = []
+          }
+
+          // DO NOT include acct_industry and acct_sub_industry for distributors
+          // They will be set to NULL by the API
+        } else {
+          // For non-distributors: Use single values only (first value if comma-separated)
+          const industriesStr = item.acct_industry || item.accountIndustry || ''
+          const subIndustriesStr = item.acct_sub_industry || item.subIndustry || ''
+
+          // If comma-separated, take only the first value
+          const singleIndustry = industriesStr.includes(',')
+            ? industriesStr.split(',')[0].trim()
+            : industriesStr
+          const singleSubIndustry = subIndustriesStr.includes(',')
+            ? subIndustriesStr.split(',')[0].trim()
+            : subIndustriesStr
+
+          if (singleIndustry) {
+            account.acct_industry = singleIndustry
+          }
+          if (singleSubIndustry) {
+            account.acct_sub_industry = singleSubIndustry
+          }
+
+          console.log('Processing non-distributor:', item.account_name, 'industry:', singleIndustry, 'subIndustry:', singleSubIndustry)
+        }
+
+        return account
+      })
       
       let successCount = 0
       let failCount = 0
@@ -479,7 +570,7 @@ export function AccountsContent() {
         }
 
         try {
-          console.log("Importing account:", accountName)
+          console.log("Importing account:", accountName, "Full data:", JSON.stringify(account, null, 2))
 
           const response = await fetch('/api/accounts', {
             method: 'POST',
@@ -488,17 +579,18 @@ export function AccountsContent() {
             },
             body: JSON.stringify({
               companyId: companyId,
+              userId: user.id,
               ...account
             })
           })
-          
+
           if (response.ok) {
             console.log("Successfully imported:", account.account_name)
             successCount++
           } else {
             const errorText = await response.text()
-            console.log("Failed to import:", account.account_name, response.status, errorText)
-            
+            console.log("Failed to import:", account.account_name, "Status:", response.status, "Error:", errorText)
+
             // Check if it's a duplicate error
             if (response.status === 400 && errorText.includes('already exists')) {
               console.log("Skipping duplicate:", account.account_name)
@@ -559,16 +651,28 @@ export function AccountsContent() {
   const handleExport = async () => {
     try {
       console.log('Export button clicked, accounts data:', accounts)
-      
-      const success = await exportToExcel(accounts, {
+
+      // Prepare data for export - handle multiple industries for distributors
+      const exportData = accounts.map(account => {
+        if (account.accountType === 'Distributor' && account.industries && account.industries.length > 0) {
+          return {
+            ...account,
+            accountIndustry: account.industries.map((pair: IndustryPair) => pair.industry).join(', '),
+            subIndustry: account.industries.map((pair: IndustryPair) => pair.subIndustry).join(', ')
+          }
+        }
+        return account
+      })
+
+      const success = await exportToExcel(exportData, {
         filename: `accounts_${new Date().toISOString().split('T')[0]}`,
         sheetName: 'Accounts',
         columns: [
           { key: 'accountName', label: 'Company Name', width: 20 },
           { key: 'customerSegment', label: 'Customer Segment', width: 18 },
           { key: 'accountType', label: 'Account Type', width: 18 },
-          { key: 'accountIndustry', label: 'Industry', width: 18 },
-          { key: 'subIndustry', label: 'Sub-Industry', width: 18 },
+          { key: 'accountIndustry', label: 'Industry', width: 30 },
+          { key: 'subIndustry', label: 'Sub-Industry', width: 30 },
           { key: 'city', label: 'City', width: 15 },
           { key: 'state', label: 'State', width: 15 },
           { key: 'country', label: 'Country', width: 15 },
@@ -619,7 +723,12 @@ export function AccountsContent() {
   }
 
   const handleDeleteAccount = async (accountId: string, accountName: string) => {
+    console.log('=== handleDeleteAccount called ===')
+    console.log('Account ID:', accountId)
+    console.log('Account Name:', accountName)
+
     if (!confirm(`Are you sure you want to delete "${accountName}"? This action cannot be undone.`)) {
+      console.log('Delete cancelled by user')
       return
     }
 
@@ -628,6 +737,7 @@ export function AccountsContent() {
     try {
       const user = localStorage.getItem('user')
       if (!user) {
+        console.error('User not found in localStorage')
         toast({
           title: "Error",
           description: "User not found. Please login again.",
@@ -640,13 +750,22 @@ export function AccountsContent() {
       const parsedUser = JSON.parse(user)
       const companyId = parsedUser.company_id
 
+      console.log('Making DELETE request to:', `/api/accounts?id=${accountId}&companyId=${companyId}`)
+
       const response = await fetch(`/api/accounts?id=${accountId}&companyId=${companyId}`, {
         method: 'DELETE'
       })
 
+      console.log('DELETE response status:', response.status)
+
       if (!response.ok) {
-        throw new Error('Failed to delete account')
+        const errorData = await response.json()
+        console.error('DELETE response error:', errorData)
+        throw new Error(errorData.error || 'Failed to delete account')
       }
+
+      const result = await response.json()
+      console.log('DELETE response data:', result)
 
       toast({
         title: "Account deleted",
@@ -654,12 +773,13 @@ export function AccountsContent() {
       })
 
       // Reload accounts
-      await loadAccounts()
+      console.log('Reloading accounts...')
+      await loadAccountsFromAPI()
     } catch (error) {
       console.error('Error deleting account:', error)
       toast({
         title: "Delete failed",
-        description: "Failed to delete account. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to delete account. Please try again.",
         variant: "destructive"
       })
     } finally {
@@ -899,17 +1019,37 @@ export function AccountsContent() {
 
                       {/* Column 2: Industry & Sub-Industry */}
                       <div className="space-y-1">
-                        {account.accountIndustry && (
-                          <div className="text-xs">
-                            <span className="text-gray-500">Industry:</span>
-                            <span className="ml-2 text-gray-900">{account.accountIndustry}</span>
-                          </div>
-                        )}
-                        {account.subIndustry && (
-                          <div className="text-xs">
-                            <span className="text-gray-500">Sub-Industry:</span>
-                            <span className="ml-2 text-gray-900">{account.subIndustry}</span>
-                          </div>
+                        {/* Show multiple industries for distributors */}
+                        {account.accountType === 'Distributor' && account.industries && account.industries.length > 0 ? (
+                          <>
+                            <div className="text-xs">
+                              <span className="text-gray-500">Industries:</span>
+                              <span className="ml-2 text-gray-900">
+                                {account.industries.map((pair: IndustryPair) => pair.industry).join(', ')}
+                              </span>
+                            </div>
+                            <div className="text-xs">
+                              <span className="text-gray-500">Sub-Industries:</span>
+                              <span className="ml-2 text-gray-900">
+                                {account.industries.map((pair: IndustryPair) => pair.subIndustry).join(', ')}
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            {account.accountIndustry && (
+                              <div className="text-xs">
+                                <span className="text-gray-500">Industry:</span>
+                                <span className="ml-2 text-gray-900">{account.accountIndustry}</span>
+                              </div>
+                            )}
+                            {account.subIndustry && (
+                              <div className="text-xs">
+                                <span className="text-gray-500">Sub-Industry:</span>
+                                <span className="ml-2 text-gray-900">{account.subIndustry}</span>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
 

@@ -77,6 +77,14 @@ export function DynamicEditLeadContent({ leadId }: DynamicEditLeadContentProps) 
       const response = await fetch(`/api/leads/${id}`)
       if (response.ok) {
         const data = await response.json()
+        console.log('=== LEAD DATA RECEIVED FROM API ===')
+        console.log('account:', data.account)
+        console.log('account_name:', data.account_name)
+        console.log('account_id:', data.account_id)
+        console.log('contact:', data.contact)
+        console.log('contact_name:', data.contact_name)
+        console.log('contact_id:', data.contact_id)
+        console.log('Full lead data:', data)
         setLeadData(data)
         // Form data will be populated after field configs are loaded
       } else {
@@ -112,6 +120,7 @@ export function DynamicEditLeadContent({ leadId }: DynamicEditLeadContentProps) 
           data
             .filter(f => f.is_enabled && f.field_name !== 'lead_id')
             .forEach(field => {
+              // For select_dependent fields (account, contact), the API already mapped the IDs
               initialData[field.field_name] = leadData[field.field_name] || ''
             })
           setFormData(initialData)
@@ -141,36 +150,43 @@ export function DynamicEditLeadContent({ leadId }: DynamicEditLeadContentProps) 
       const initializeFormData = async () => {
         const initialData: Record<string, any> = {}
 
+        console.log('=== INITIALIZING FORM DATA ===')
+        console.log('Lead data account:', leadData.account)
+        console.log('Lead data account_id:', leadData.account_id)
+        console.log('Lead data contact:', leadData.contact)
+        console.log('Lead data contact_id:', leadData.contact_id)
+
         // First, populate all basic fields from lead data
         fieldConfigs
           .filter(f => f.is_enabled && f.field_name !== 'lead_id')
           .forEach(field => {
+            // For select_dependent fields (account, contact), the API already mapped the IDs
+            // For other fields, use the direct value
             initialData[field.field_name] = leadData[field.field_name] || ''
+
+            if (field.field_name === 'account' || field.field_name === 'contact') {
+              console.log(`Setting ${field.field_name} = ${leadData[field.field_name]}`)
+            }
           })
 
-        // Ensure account_id and contact are properly set from lead data
-        const accountId = leadData.account_id || leadData.account
-        const contactId = leadData.contact_id || leadData.contact
-
-        if (accountId) {
-          initialData.account_id = accountId
-          initialData.account = accountId
+        // Ensure account_id and contact_id are set for dependent field lookups
+        if (leadData.account_id) {
+          initialData.account_id = leadData.account_id
         }
 
-        if (contactId) {
-          initialData.contact_id = contactId
-          initialData.contact = contactId
+        if (leadData.contact_id) {
+          initialData.contact_id = leadData.contact_id
         }
 
         // If there's a contact_id, fetch contact details to populate contact-related fields
-        if (contactId) {
+        if (leadData.contact_id) {
           try {
             const companyId = currentUser?.company_id
             const response = await fetch(`/api/contacts?companyId=${companyId}`)
             if (response.ok) {
               const contactsData = await response.json()
               const contacts = contactsData.contacts || contactsData || []
-              const contact = contacts.find((c: any) => c.id === contactId)
+              const contact = contacts.find((c: any) => c.id === leadData.contact_id)
 
               if (contact) {
                 // Populate contact fields if they exist in field configs
@@ -197,6 +213,10 @@ export function DynamicEditLeadContent({ leadId }: DynamicEditLeadContentProps) 
         }
 
         console.log('Initialized form data:', initialData)
+        console.log('account_id in form data:', initialData.account_id)
+        console.log('account in form data:', initialData.account)
+        console.log('contact_id in form data:', initialData.contact_id)
+        console.log('contact in form data:', initialData.contact)
         setFormData(initialData)
       }
 
@@ -314,6 +334,30 @@ export function DynamicEditLeadContent({ leadId }: DynamicEditLeadContentProps) 
 
     setSaving(true)
     try {
+      console.log('Lead data before save:', leadData)
+      console.log('Form data before save:', formData)
+
+      // Check if lead is being qualified (case-insensitive check for various field names)
+      const wasQualified = leadData?.lead_status?.toLowerCase() === 'qualified' ||
+                          leadData?.salesStage?.toLowerCase() === 'qualified' ||
+                          leadData?.sales_stage?.toLowerCase() === 'qualified'
+      const isNowQualified = formData.lead_status?.toLowerCase() === 'qualified' ||
+                            formData.salesStage?.toLowerCase() === 'qualified' ||
+                            formData.sales_stage?.toLowerCase() === 'qualified'
+      const shouldCreateDeal = !wasQualified && isNowQualified
+
+      console.log('Qualification check:', {
+        wasQualified,
+        isNowQualified,
+        shouldCreateDeal,
+        leadData_lead_status: leadData?.lead_status,
+        leadData_salesStage: leadData?.salesStage,
+        leadData_sales_stage: leadData?.sales_stage,
+        formData_lead_status: formData.lead_status,
+        formData_salesStage: formData.salesStage,
+        formData_sales_stage: formData.sales_stage
+      })
+
       const response = await fetch('/api/leads', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -325,11 +369,48 @@ export function DynamicEditLeadContent({ leadId }: DynamicEditLeadContentProps) 
       })
 
       if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Lead updated successfully"
-        })
-        router.push("/leads")
+        const savedLead = await response.json()
+
+        // If lead was qualified, create a deal automatically
+        if (shouldCreateDeal) {
+          console.log('Creating deal from qualified lead...')
+          try {
+            // Fetch complete lead data with products
+            console.log('Fetching complete lead data from API...')
+            const leadResponse = await fetch(`/api/leads/${leadId}`)
+            console.log('Lead fetch response status:', leadResponse.status)
+            const completeLead = leadResponse.ok ? await leadResponse.json() : savedLead
+            console.log('Complete lead data:', completeLead)
+
+            console.log('Calling createDealFromLead...')
+            const createdDeal = await createDealFromLead(completeLead)
+            console.log('Deal created successfully:', createdDeal)
+
+            toast({
+              title: "Success",
+              description: "Lead qualified and deal created successfully! Redirecting to Deals page..."
+            })
+            // Redirect to deals page after qualification
+            router.push("/deals")
+          } catch (dealError) {
+            console.error('Error creating deal from qualified lead:', dealError)
+            console.error('Error stack:', dealError instanceof Error ? dealError.stack : 'No stack trace')
+            toast({
+              title: "Warning",
+              description: `Lead updated but failed to create deal: ${dealError instanceof Error ? dealError.message : 'Unknown error'}`,
+              variant: "destructive",
+              duration: 10000
+            })
+            router.push("/leads")
+          }
+        } else {
+          console.log('Not creating deal - shouldCreateDeal is false')
+          toast({
+            title: "Success",
+            description: "Lead updated successfully"
+          })
+          router.push("/leads")
+        }
       } else {
         const error = await response.json()
         toast({
@@ -348,6 +429,151 @@ export function DynamicEditLeadContent({ leadId }: DynamicEditLeadContentProps) 
     } finally {
       setSaving(false)
     }
+  }
+
+  const createDealFromLead = async (lead: any) => {
+    console.log('createDealFromLead called with lead:', lead)
+
+    // Determine primary product name for deal name
+    const primaryProductName = lead.leadProducts && lead.leadProducts.length > 0
+      ? lead.leadProducts[0].product_name
+      : lead.product_name || 'Products'
+
+    console.log('Primary product name:', primaryProductName)
+
+    // Account and contact are mandatory fields in leads
+    console.log('Account name:', lead.account_name)
+    console.log('Contact name:', lead.contact_name)
+
+    const dealData = {
+      deal_name: `${lead.account_name} - ${primaryProductName}${lead.leadProducts && lead.leadProducts.length > 1 ? ` +${lead.leadProducts.length - 1} more` : ''}`,
+      account_name: lead.account_name,
+      contact_person: lead.contact_name,
+      product: primaryProductName,
+      value: lead.calculatedBudget || lead.budget || 0,
+      stage: 'Qualification',
+      probability: 25,
+      expected_close_date: lead.expected_closing_date,
+      assigned_to: lead.assigned_to,
+      priority: 'Medium',
+      status: 'Active',
+      source: lead.lead_source,
+      source_lead_id: lead.id,
+      last_activity: 'Created from qualified lead',
+      notes: `Converted from lead: ${lead.id}. Original notes: ${lead.notes || 'None'}`,
+
+      // Copy contact information
+      phone: lead.phone,
+      email: lead.email,
+      whatsapp: lead.whatsapp,
+
+      // Copy lead relations
+      product_id: lead.product_id,
+      account_id: lead.account_id,
+      contact_id: lead.contact_id,
+
+      // Copy location information
+      location: lead.location,
+      city: lead.city,
+      state: lead.state,
+      department: lead.department,
+
+      // Products will be fetched and added below
+      selected_products: [],
+
+      // Copy lead tracking and dates
+      lead_date: lead.lead_date,
+      closing_date: lead.closing_date,
+      next_followup_date: lead.next_followup_date,
+      buyer_ref: lead.buyer_ref,
+
+      // Copy financial details
+      budget: lead.budget,
+      quantity: lead.quantity,
+      price_per_unit: lead.price_per_unit
+    }
+
+    // Get products from lead_products table
+    try {
+      console.log(`Fetching products for lead ${lead.id}`)
+      const leadProductsResponse = await fetch(`/api/leads/${lead.id}/products`)
+      const leadProductsData = await leadProductsResponse.json()
+      const realProducts = leadProductsData.products || []
+
+      console.log(`Lead has ${realProducts.length} products:`, realProducts)
+
+      if (realProducts.length > 0) {
+        dealData.selected_products = realProducts.map((product: any) => ({
+          product_id: null,
+          product_name: product.product_name,
+          quantity: product.quantity || 1,
+          price_per_unit: product.price_per_unit || 0,
+          total_amount: (product.quantity || 1) * (product.price_per_unit || 0)
+        }))
+      } else if (lead.product_name) {
+        dealData.selected_products = [{
+          product_id: null,
+          product_name: lead.product_name,
+          quantity: lead.quantity || 1,
+          price_per_unit: lead.price_per_unit || 0,
+          total_amount: (lead.quantity || 1) * (lead.price_per_unit || 0)
+        }]
+      }
+    } catch (error) {
+      console.error('Error fetching lead products:', error)
+      if (lead.product_name) {
+        dealData.selected_products = [{
+          product_id: null,
+          product_name: lead.product_name,
+          quantity: lead.quantity || 1,
+          price_per_unit: lead.price_per_unit || 0,
+          total_amount: (lead.quantity || 1) * (lead.price_per_unit || 0)
+        }]
+      }
+    }
+
+    console.log('Creating deal with data:', dealData)
+
+    // Log the stringified data to check for serialization issues
+    try {
+      const stringifiedData = JSON.stringify(dealData)
+      console.log('Stringified deal data length:', stringifiedData.length)
+      console.log('Stringified deal data preview:', stringifiedData.substring(0, 500))
+    } catch (stringifyError) {
+      console.error('ERROR: Cannot stringify dealData:', stringifyError)
+      throw new Error('Deal data contains invalid values that cannot be serialized')
+    }
+
+    console.log('About to send POST request to /api/deals...')
+
+    let response
+    try {
+      response = await fetch('/api/deals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dealData)
+      })
+      console.log('Fetch completed, response received')
+    } catch (fetchError) {
+      console.error('ERROR during fetch:', fetchError)
+      throw new Error(`Network error while creating deal: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`)
+    }
+
+    console.log('Deal creation response status:', response.status)
+    console.log('Deal creation response ok:', response.ok)
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+      console.error('Deal creation failed with response:', errorData)
+      console.error('Error details:', errorData.details)
+      console.error('Error hint:', errorData.hint)
+      console.error('Error code:', errorData.code)
+      throw new Error(`Failed to create deal: ${errorData.details || errorData.error || 'Unknown error'}`)
+    }
+
+    const createdDeal = await response.json()
+    console.log('Deal created in database:', createdDeal)
+    return createdDeal
   }
 
   const getSectionFields = (section: string) => {

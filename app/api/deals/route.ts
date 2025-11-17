@@ -68,8 +68,15 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating deal:', error)
+      console.error('Deal data that failed:', dealToInsert)
+      console.error('Full error details:', JSON.stringify(error, null, 2))
       return NextResponse.json(
-        { error: 'Failed to create deal' },
+        {
+          error: 'Failed to create deal',
+          details: error.message || error.toString(),
+          hint: error.hint,
+          code: error.code
+        },
         { status: 500 }
       )
     }

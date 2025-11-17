@@ -792,7 +792,38 @@ export function QuotationsContent() {
           window.location.href = '/sales-orders'
         }, 2000) // 2 second delay
       } else {
-        throw new Error('Failed to create sales order via API')
+        // Try to parse error as JSON first, fall back to text
+        let errorMessage = 'Failed to create sales order via API'
+        let errorDetails = ''
+
+        try {
+          const errorData = await response.json()
+          console.error('API Error Response:', errorData)
+
+          // Extract error message and details
+          if (errorData.error) {
+            errorMessage = errorData.error
+          }
+          if (errorData.details) {
+            errorDetails = errorData.details
+          }
+          if (errorData.hint) {
+            errorDetails += (errorDetails ? ' | ' : '') + errorData.hint
+          }
+        } catch (parseError) {
+          // If JSON parsing fails, try to get text
+          const errorText = await response.text()
+          console.error('API Error Text:', errorText)
+          errorMessage = errorText || errorMessage
+        }
+
+        // Show detailed error to user
+        toast({
+          title: "Failed to create sales order",
+          description: errorDetails ? `${errorMessage}: ${errorDetails}` : errorMessage,
+          variant: "destructive"
+        })
+        throw new Error(errorMessage)
       }
     } catch (error) {
       console.error("Failed to create sales order:", error)
@@ -835,9 +866,10 @@ export function QuotationsContent() {
           throw new Error('Failed to create sales order')
         }
       } catch (fallbackError) {
+        const errorMessage = fallbackError instanceof Error ? fallbackError.message : 'Unknown error occurred'
         toast({
           title: "Error",
-          description: "Failed to create sales order from quotation",
+          description: `Failed to create sales order from quotation: ${errorMessage}`,
           variant: "destructive"
         })
       }
@@ -876,15 +908,45 @@ export function QuotationsContent() {
           window.location.href = '/invoices'
         }, 2000) // 2 second delay
       } else {
-        const error = await response.text()
-        console.error('API Error:', error)
-        throw new Error('Failed to create invoice via API')
+        // Try to parse error as JSON first, fall back to text
+        let errorMessage = 'Failed to create invoice via API'
+        let errorDetails = ''
+
+        try {
+          const errorData = await response.json()
+          console.error('API Error Response:', errorData)
+
+          // Extract error message and details
+          if (errorData.error) {
+            errorMessage = errorData.error
+          }
+          if (errorData.details) {
+            errorDetails = errorData.details
+          }
+          if (errorData.hint) {
+            errorDetails += (errorDetails ? ' | ' : '') + errorData.hint
+          }
+        } catch (parseError) {
+          // If JSON parsing fails, try to get text
+          const errorText = await response.text()
+          console.error('API Error Text:', errorText)
+          errorMessage = errorText || errorMessage
+        }
+
+        // Show detailed error to user
+        toast({
+          title: "Failed to create invoice",
+          description: errorDetails ? `${errorMessage}: ${errorDetails}` : errorMessage,
+          variant: "destructive"
+        })
+        return
       }
     } catch (error) {
       console.error('Error creating invoice:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
       toast({
         title: "Error",
-        description: "Failed to create invoice from quotation",
+        description: `Failed to create invoice from quotation: ${errorMessage}`,
         variant: "destructive"
       })
     }

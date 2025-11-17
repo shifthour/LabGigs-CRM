@@ -123,6 +123,8 @@ export function LeadsContent() {
   const [selectedStage, setSelectedStage] = useState("All")
   const [selectedAssignedTo, setSelectedAssignedTo] = useState("All")
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 })
   const [editingLead, setEditingLead] = useState<any>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false)
@@ -196,7 +198,8 @@ export function LeadsContent() {
                 try {
                   const accountResponse = await fetch(`/api/accounts?companyId=${lead.company_id}`)
                   if (accountResponse.ok) {
-                    const accounts = await accountResponse.json()
+                    const accountsData = await accountResponse.json()
+                    const accounts = Array.isArray(accountsData) ? accountsData : accountsData.accounts || []
                     accountDetails = accounts.find((a: any) => a.id === actualAccountId)
                   }
                 } catch (err) {
@@ -309,21 +312,30 @@ export function LeadsContent() {
         
         console.log("loadLeads - API leads:", transformedLeads)
         setLeadsList(transformedLeads)
-        
-        // Calculate stats
-        const qualifiedLeads = transformedLeads.filter((lead: any) => 
+
+        // Filter out qualified leads (they should be in deals page)
+        const activeLeads = transformedLeads.filter((lead: any) => {
+          const isQualified = lead.leadStatus?.toLowerCase() === 'qualified' ||
+                             lead.salesStage?.toLowerCase() === 'qualified' ||
+                             lead.sales_stage?.toLowerCase() === 'qualified' ||
+                             lead.lead_status?.toLowerCase() === 'qualified'
+          return !isQualified
+        })
+
+        // Calculate stats (using active leads only)
+        const qualifiedLeads = transformedLeads.filter((lead: any) =>
           lead.salesStage === 'Qualified' || lead.salesStage === 'Proposal' || lead.salesStage === 'Negotiation'
         ).length
         const conversionRate = transformedLeads.length > 0 ? Math.round((qualifiedLeads / transformedLeads.length) * 100) : 0
-        
-        // Calculate total pipeline value from calculated budgets (multiple products support)
-        const totalPipelineValue = transformedLeads.reduce((sum: number, lead: any) => {
+
+        // Calculate total pipeline value from active leads only
+        const totalPipelineValue = activeLeads.reduce((sum: number, lead: any) => {
           const budget = parseFloat(lead.calculatedBudget) || parseFloat(lead.budget) || 0
           return sum + budget
         }, 0)
-        
+
         setLeadsStats({
-          total: transformedLeads.length,
+          total: activeLeads.length,
           qualified: qualifiedLeads,
           conversionRate: conversionRate,
           totalPipelineValue: totalPipelineValue
@@ -415,10 +427,18 @@ export function LeadsContent() {
   }
 
   const filteredLeads = leadsList.filter((lead) => {
+    // Exclude qualified leads (they should be in deals page)
+    const isQualified = lead.leadStatus?.toLowerCase() === 'qualified' ||
+                       lead.salesStage?.toLowerCase() === 'qualified' ||
+                       lead.sales_stage?.toLowerCase() === 'qualified' ||
+                       lead.lead_status?.toLowerCase() === 'qualified'
+
+    if (isQualified) return false
+
     // Search filter
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase()
-      const matchesSearch = 
+      const matchesSearch =
         lead.leadName?.toLowerCase().includes(searchLower) ||
         lead.contactName?.toLowerCase().includes(searchLower) ||
         lead.city?.toLowerCase().includes(searchLower) ||
@@ -427,18 +447,18 @@ export function LeadsContent() {
         lead.phone?.includes(searchTerm)
       if (!matchesSearch) return false
     }
-    
+
     // Stage filter
     if (selectedStage !== "All" && lead.leadStatus !== selectedStage) {
       return false
     }
-    
-    // Assigned to filter  
+
+    // Assigned to filter
     if (selectedAssignedTo !== "All" && lead.assignedTo !== selectedAssignedTo) {
       return false
     }
-    
-    
+
+
     return true
   })
 
@@ -466,11 +486,175 @@ export function LeadsContent() {
   }
 
   const handleImportData = async (importedLeads: any[]) => {
+    setIsImporting(true)
+    setImportProgress({ current: 0, total: importedLeads.length })
+
     try {
       const companyId = localStorage.getItem('currentCompanyId') || 'de19ccb7-e90d-4507-861d-a3aecf5e3f29'
-      
+
+      // Fetch all products once for lookup
+      const productsResponse = await fetch(`/api/products?companyId=${companyId}`)
+      let allProducts: any[] = []
+      if (productsResponse.ok) {
+        allProducts = await productsResponse.json()
+        console.log('Fetched products from API:', allProducts.length, 'products')
+        console.log('Product names:', allProducts.map(p => p.product_name))
+      } else {
+        console.error('Failed to fetch products:', productsResponse.status, productsResponse.statusText)
+      }
+
+      // Fetch all accounts once for lookup
+      const accountsResponse = await fetch(`/api/accounts?companyId=${companyId}`)
+      let allAccounts: any[] = []
+      if (accountsResponse.ok) {
+        const accountsData = await accountsResponse.json()
+        allAccounts = Array.isArray(accountsData) ? accountsData : accountsData.accounts || []
+        console.log('Fetched accounts from API:', allAccounts.length, 'accounts')
+      } else {
+        console.error('Failed to fetch accounts:', accountsResponse.status, accountsResponse.statusText)
+      }
+
+      // Fetch all contacts once for lookup
+      const contactsResponse = await fetch(`/api/contacts?companyId=${companyId}`)
+      let allContacts: any[] = []
+      if (contactsResponse.ok) {
+        const contactsData = await contactsResponse.json()
+        allContacts = Array.isArray(contactsData) ? contactsData : contactsData.contacts || []
+        console.log('Fetched contacts from API:', allContacts.length, 'contacts')
+      } else {
+        console.error('Failed to fetch contacts:', contactsResponse.status, contactsResponse.statusText)
+      }
+
       // Save imported leads to database instead of localStorage
-      const promises = importedLeads.map(async (leadData) => {
+      let processedCount = 0
+      const promises = importedLeads.map(async (leadData, index) => {
+        // Process products if productNames are provided
+        let products: any[] = []
+        let notFoundProducts: string[] = []
+
+        console.log('Processing lead:', leadData)
+
+        if (leadData.productNames || leadData.productQuantities) {
+          console.log('Product data found:', leadData.productNames, leadData.productQuantities)
+          // Convert to string to handle numeric values from Excel
+          const productNamesStr = String(leadData.productNames || '')
+          const productQuantitiesStr = String(leadData.productQuantities || '')
+
+          // Skip if productNames is empty or just 'undefined'
+          if (!productNamesStr || productNamesStr === 'undefined' || productNamesStr.trim() === '') {
+            console.log('No product names provided, skipping product lookup')
+          } else {
+            // Split by comma and trim whitespace
+            const productNames = productNamesStr
+              .split(',')
+              .map((name: string) => name.trim())
+              .filter((name: string) => name.length > 0)
+
+            const productQuantities = productQuantitiesStr
+              .split(',')
+              .map((qty: string) => qty.trim())
+              .filter((qty: string) => qty.length > 0)
+
+            // Process each product name
+            console.log('Product names to lookup:', productNames)
+            console.log('Available products:', allProducts.map(p => p.product_name))
+
+            for (let i = 0; i < productNames.length; i++) {
+              const productName = productNames[i]
+              const quantity = productQuantities[i] ? parseInt(productQuantities[i]) : 1
+
+              // Look up product by name (case-insensitive)
+              const matchedProduct = allProducts.find(
+                (p: any) => p.product_name?.toLowerCase() === productName.toLowerCase()
+              )
+
+              if (matchedProduct) {
+                // Get price from product (check multiple price fields)
+                const price = matchedProduct.price || matchedProduct.base_price || matchedProduct.cost_price || 0
+
+                console.log(`Found product: ${productName}, price: ${price}, quantity: ${quantity}`)
+
+                products.push({
+                  product_id: matchedProduct.id,
+                  product_name: matchedProduct.product_name,
+                  quantity: quantity,
+                  price_per_unit: price,
+                  notes: ''
+                })
+              } else {
+                console.warn(`Product not found: ${productName}`)
+                notFoundProducts.push(productName)
+              }
+            }
+
+            console.log('Final products array:', products)
+
+            // If products were specified but none were found, throw an error
+            if (productNames.length > 0 && notFoundProducts.length === productNames.length) {
+              throw new Error(`Products not found in database: ${notFoundProducts.join(', ')}. Please check product names match exactly.`)
+            }
+          }
+        }
+
+        // Debug: Log the lead data received
+        console.log('Lead data received for import:', leadData)
+
+        // Normalize field names: 'account' field from template should map to 'account_name' in DB
+        // Also clean non-breaking spaces and other whitespace from Excel
+        const cleanText = (text: string | undefined) => {
+          if (!text) return text
+          return text.replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim()
+        }
+
+        const accountName = cleanText(leadData.account_name || leadData.account)
+        const contactName = cleanText(leadData.contact_name || leadData.contact)
+
+        console.log('Account name:', accountName)
+        console.log('Contact name:', contactName)
+
+        // Lookup account by name if provided
+        if (accountName) {
+          console.log('Looking up account:', accountName)
+          console.log('Available accounts:', allAccounts.map(a => ({ id: a.id, name: a.account_name })))
+          const matchedAccount = allAccounts.find(
+            (a: any) => a.account_name?.toLowerCase() === accountName.toLowerCase()
+          )
+          if (matchedAccount) {
+            console.log(`✓ Found account: ${accountName} -> ID: ${matchedAccount.id}`)
+            leadData.account_id = matchedAccount.id
+          } else {
+            console.log(`✗ Account not found: ${accountName}`)
+          }
+          // Set both field names: 'account' for field config validation, 'account_name' for DB column
+          leadData.account = accountName
+          leadData.account_name = accountName
+        } else {
+          console.log('⚠ No account name in lead data')
+        }
+
+        // Lookup contact by name if provided
+        if (contactName) {
+          console.log('Looking up contact:', contactName)
+          console.log('Available contacts:', allContacts.map(c => ({ id: c.id, name: c.name })))
+          const matchedContact = allContacts.find(
+            (c: any) => c.name?.toLowerCase() === contactName.toLowerCase()
+          )
+          if (matchedContact) {
+            console.log(`✓ Found contact: ${contactName} -> ID: ${matchedContact.id}`)
+            leadData.contact_id = matchedContact.id
+          } else {
+            console.log(`✗ Contact not found: ${contactName}`)
+          }
+          // Set both field names: 'contact' for field config validation, 'contact_name' for DB column
+          leadData.contact = contactName
+          leadData.contact_name = contactName
+        } else {
+          console.log('⚠ No contact name in lead data')
+        }
+
+        // Remove productNames and productQuantities from leadData before sending to API
+        const { productNames, productQuantities, ...cleanLeadData } = leadData
+
         const response = await fetch('/api/leads', {
           method: 'POST',
           headers: {
@@ -478,28 +662,64 @@ export function LeadsContent() {
           },
           body: JSON.stringify({
             companyId,
-            ...leadData
+            ...cleanLeadData,
+            selected_products: products.length > 0 ? products : undefined
           })
         })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error(`Failed to import lead:`, errorText)
+          throw new Error(`Failed to import lead: ${errorText}`)
+        }
+
+        // Update progress
+        processedCount++
+        setImportProgress({ current: processedCount, total: importedLeads.length })
+
         return response.json()
       })
-      
-      await Promise.all(promises)
-      
+
+      const results = await Promise.allSettled(promises)
+
+      const successCount = results.filter(r => r.status === 'fulfilled').length
+      const failCount = results.filter(r => r.status === 'rejected').length
+
+      console.log(`Import complete: ${successCount} succeeded, ${failCount} failed`)
+
       // Reload leads from database
-      loadLeads()
-      
-      toast({
-        title: "Data imported",
-        description: `Successfully imported ${importedLeads.length} leads to database.`
-      })
+      await loadLeads()
+
+      if (failCount > 0) {
+        const errors = results
+          .filter(r => r.status === 'rejected')
+          .map((r: any) => r.reason.message)
+          .slice(0, 3)
+          .join(', ')
+
+        toast({
+          title: "Import completed with errors",
+          description: `Successfully imported ${successCount}/${importedLeads.length} leads. Failed: ${failCount}. Errors: ${errors}`,
+          variant: "default",
+          duration: 10000
+        })
+      } else {
+        toast({
+          title: "Data imported",
+          description: `Successfully imported ${successCount} leads to database.`
+        })
+      }
     } catch (error) {
       console.error('Error importing leads:', error)
       toast({
         title: "Import failed",
-        description: "Failed to import leads to database",
+        description: error instanceof Error ? error.message : "Failed to import leads to database",
         variant: "destructive"
       })
+    } finally {
+      // Reset importing state
+      setIsImporting(false)
+      setImportProgress({ current: 0, total: 0 })
     }
   }
 
@@ -676,15 +896,21 @@ export function LeadsContent() {
       }
       
       if (editingLead) {
-        setLeadsList(prevLeads => 
+        setLeadsList(prevLeads =>
           prevLeads.map(lead => lead.id === editingLead.id ? transformedLead : lead)
         )
-        
+
         if (shouldCreateDeal) {
           toast({
             title: "Success",
-            description: "Lead qualified and deal created successfully! Check the Deals tab."
+            description: "Lead qualified and deal created successfully! Redirecting to Deals page..."
           })
+          // Close modal
+          setIsAddLeadModalOpen(false)
+          setEditingLead(null)
+          // Redirect to deals page after qualification
+          router.push("/deals")
+          return
         } else {
           toast({
             title: "Success",
@@ -698,10 +924,10 @@ export function LeadsContent() {
           description: "Lead created successfully"
         })
       }
-      
+
       // Update stats
       loadLeads()
-      
+
       // Close modal
       setIsAddLeadModalOpen(false)
       setEditingLead(null)
@@ -945,7 +1171,6 @@ export function LeadsContent() {
                 <SelectItem value="All">All Stages</SelectItem>
                 <SelectItem value="New">New</SelectItem>
                 <SelectItem value="Contacted">Contacted</SelectItem>
-                <SelectItem value="Qualified">Qualified</SelectItem>
                 <SelectItem value="Disqualified">Disqualified</SelectItem>
               </SelectContent>
             </Select>
@@ -995,8 +1220,13 @@ export function LeadsContent() {
                         {lead.status}
                       </span>
                     </div>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">
-                      Lead Title: {lead.leadName || lead.accountName}
+                    {lead.leadName && (
+                      <p className="text-sm font-semibold text-gray-900 mt-1">
+                        {lead.leadName}
+                      </p>
+                    )}
+                    <p className="text-sm text-gray-700 mt-1">
+                      <span className="font-medium">Account:</span> {lead.accountName}
                     </p>
                     {lead.department && lead.department !== "None" && (
                       <p className="text-sm text-gray-600">Department: {lead.department}</p>
@@ -1114,6 +1344,8 @@ export function LeadsContent() {
         onClose={() => setIsImportModalOpen(false)}
         moduleType="leads"
         onImport={handleImportData}
+        isImporting={isImporting}
+        importProgress={importProgress}
       />
 
       {/* Edit Lead Modal */}

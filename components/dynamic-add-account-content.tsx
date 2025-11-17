@@ -16,7 +16,6 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { DynamicAccountField } from "./dynamic-account-field"
-import { IndustrySubIndustryPairs } from "./industry-subindustry-pairs"
 
 interface FieldConfig {
   id: string
@@ -62,7 +61,19 @@ export function DynamicAddAccountContent() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
-  const [industries, setIndustries] = useState<{ industry: string; subIndustry: string }[]>([])
+  const [industries, setIndustries] = useState<{ industry: string; subIndustry: string }[]>([{ industry: '', subIndustry: '' }])
+
+  const handleIndustriesChange = (newIndustries: { industry: string; subIndustry: string }[]) => {
+    setIndustries(newIndustries)
+    // Clear industries error when user makes changes
+    if (errors['industries']) {
+      setErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors['industries']
+        return newErrors
+      })
+    }
+  }
 
   useEffect(() => {
     const user = localStorage.getItem('user')
@@ -125,15 +136,30 @@ export function DynamicAddAccountContent() {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
+    const isDistributor = formData.account_type === 'Distributor' || formData.accountType === 'Distributor'
 
     fieldConfigs
       .filter(f => f.is_enabled && f.is_mandatory && f.field_name !== 'account_id')
       .forEach(field => {
+        // Skip acct_industry validation for distributors (we'll validate industries array instead)
+        // Skip acct_sub_industry for distributors (it's included in industries array)
+        if (isDistributor && (field.field_name === 'acct_industry' || field.field_name === 'acct_sub_industry')) {
+          return
+        }
+
         const value = formData[field.field_name]
         if (!value || (typeof value === 'string' && value.trim() === '')) {
           newErrors[field.field_name] = `${field.field_label} is required`
         }
       })
+
+    // Validate industries for distributors
+    if (isDistributor) {
+      const hasValidIndustry = industries.some(pair => pair.industry && pair.subIndustry)
+      if (!hasValidIndustry) {
+        newErrors['industries'] = 'At least one complete industry-subindustry pair is required for distributors'
+      }
+    }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -194,7 +220,7 @@ export function DynamicAddAccountContent() {
               resetData[field.field_name] = ''
             })
           setFormData(resetData)
-          setIndustries([])
+          setIndustries([{ industry: '', subIndustry: '' }])
           setShowReview(false)
           setErrors({})
         } else {
@@ -347,7 +373,7 @@ export function DynamicAddAccountContent() {
               })}
 
               {/* Distributor Industries - Review */}
-              {formData.account_type === 'Distributor' && industries.length > 0 && (
+              {(formData.account_type === 'Distributor' || formData.accountType === 'Distributor') && industries.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">Distributor Industries</CardTitle>
@@ -452,7 +478,7 @@ export function DynamicAddAccountContent() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {sectionFields.map(field => (
+                      {sectionFields.map((field, index) => (
                         <div
                           key={field.id}
                           id={`field-${field.field_name}`}
@@ -464,6 +490,9 @@ export function DynamicAddAccountContent() {
                             onChange={handleFieldChange}
                             error={errors[field.field_name]}
                             dependentValues={formData}
+                            industries={industries}
+                            onIndustriesChange={handleIndustriesChange}
+                            industriesError={errors['industries']}
                           />
                         </div>
                       ))}
@@ -472,24 +501,6 @@ export function DynamicAddAccountContent() {
                 </Card>
               )
             })}
-
-            {/* Distributor Industries - Only show if account_type is Distributor */}
-            {formData.account_type === 'Distributor' && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Distributor Industries</CardTitle>
-                  <CardDescription>
-                    <span className="text-red-600">* Required - Select all industries this distributor operates in</span>
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <IndustrySubIndustryPairs
-                    value={industries}
-                    onChange={setIndustries}
-                  />
-                </CardContent>
-              </Card>
-            )}
           </div>
         </ScrollArea>
 

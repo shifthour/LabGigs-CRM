@@ -53,9 +53,13 @@ export function DynamicLeadField({
   // Fetch contacts when field is 'contact' and account is selected
   useEffect(() => {
     if (config.field_name === 'contact' && config.field_type === 'select_dependent') {
+      console.log('Contact field checking for account_id:', dependentValues.account_id)
+      console.log('All dependent values:', dependentValues)
       if (dependentValues.account_id) {
+        console.log('Fetching contacts for account:', dependentValues.account_id)
         fetchContacts(dependentValues.account_id)
       } else {
+        console.log('No account_id found, clearing contacts')
         setContacts([])
       }
     }

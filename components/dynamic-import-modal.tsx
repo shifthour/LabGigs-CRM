@@ -71,12 +71,40 @@ export function DynamicImportModal({
 
   const handleDownloadTemplate = () => {
     try {
+      // Filter out system-generated fields like account_id, lead_id, contact_id, product_id
+      const templateFields = fieldConfigs.filter(field =>
+        !['account_id', 'lead_id', 'contact_id', 'product_id'].includes(field.field_name)
+      )
+
+      // Add product columns for leads
+      if (moduleType === 'leads') {
+        templateFields.push({
+          field_name: 'productNames',
+          field_label: 'Product Names (comma-separated)',
+          field_type: 'text',
+          is_mandatory: false,
+          is_enabled: true
+        })
+        templateFields.push({
+          field_name: 'productQuantities',
+          field_label: 'Product Quantities (comma-separated)',
+          field_type: 'text',
+          is_mandatory: false,
+          is_enabled: true
+        })
+      }
+
       // Create headers from field configurations
-      const headers = fieldConfigs.map(field => field.field_label)
+      const headers = templateFields.map(field => field.field_label)
 
       // Create sample data row with placeholders
-      const sampleRow = fieldConfigs.map(field => {
-        if (field.field_type === 'select' && field.field_options && field.field_options.length > 0) {
+      const sampleRow = templateFields.map(field => {
+        // Special handling for product fields
+        if (field.field_name === 'productNames') {
+          return 'Headphones, Mouse, Keyboard'
+        } else if (field.field_name === 'productQuantities') {
+          return '2, 5, 3'
+        } else if (field.field_type === 'select' && field.field_options && field.field_options.length > 0) {
           return field.field_options[0]
         } else if (field.field_type === 'email') {
           return 'example@company.com'
@@ -95,7 +123,7 @@ export function DynamicImportModal({
       const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow])
 
       // Set column widths
-      ws['!cols'] = fieldConfigs.map(() => ({ wch: 20 }))
+      ws['!cols'] = templateFields.map(() => ({ wch: 20 }))
 
       // Create workbook
       const wb = XLSX.utils.book_new()
@@ -164,6 +192,12 @@ export function DynamicImportModal({
             labelToFieldName.set(config.field_label.toLowerCase(), config.field_name)
           })
 
+          // Add product fields mapping for leads
+          if (moduleType === 'leads') {
+            labelToFieldName.set('product names (comma-separated)', 'productNames')
+            labelToFieldName.set('product quantities (comma-separated)', 'productQuantities')
+          }
+
           const mappedData = rows
             .filter(row => row.some(cell => cell !== undefined && cell !== null && cell !== ''))
             .map(row => {
@@ -177,6 +211,8 @@ export function DynamicImportModal({
               return obj
             })
 
+          console.log('Mapped import data:', mappedData)
+
           if (mappedData.length === 0) {
             toast({
               title: "No valid data",
@@ -189,6 +225,11 @@ export function DynamicImportModal({
           // Call the import handler
           await onImport(mappedData)
           setSelectedFile(null)
+
+          // Close the modal after import completes
+          setTimeout(() => {
+            onClose()
+          }, 500)
         } catch (error) {
           console.error('Error parsing file:', error)
           toast({
@@ -269,6 +310,15 @@ export function DynamicImportModal({
                       <p className="font-medium text-amber-900">Required fields:</p>
                       <p className="text-amber-800">
                         {fieldConfigs.filter(f => f.is_mandatory).map(f => f.field_label).join(', ')}
+                      </p>
+                    </div>
+                  )}
+                  {moduleType === 'accounts' && (
+                    <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                      <p className="font-medium text-blue-900">For Distributor accounts:</p>
+                      <p className="text-blue-800">
+                        If Account Type is "Distributor", you can add multiple industries by separating them with commas.
+                        Example: <span className="font-mono">Pharma Biopharma, Chemicals Petrochemicals</span>
                       </p>
                     </div>
                   )}

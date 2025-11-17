@@ -84,6 +84,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { companyId, userId, ...accountData } = body
 
+    console.log('=== POST /api/accounts - RAW DATA ===')
+    console.log('Account Name:', accountData.account_name)
+    console.log('Account Type:', accountData.account_type)
+    console.log('acct_industry:', accountData.acct_industry)
+    console.log('acct_sub_industry:', accountData.acct_sub_industry)
+    console.log('industries array:', accountData.industries)
+    console.log('Full accountData keys:', Object.keys(accountData))
+
     if (!companyId) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
@@ -115,7 +123,19 @@ export async function POST(request: NextRequest) {
     // Clean and filter the account data
     // Only include fields that are enabled in the configuration
     const cleanedAccountData: any = {}
+
+    // Check if this is a distributor with industries
+    const isDistributor = accountData.account_type === 'Distributor' && accountData.industries && Array.isArray(accountData.industries) && accountData.industries.length > 0
+
+    console.log('Processing account:', accountData.account_name, 'Type:', accountData.account_type, 'Is Distributor with industries:', isDistributor)
+
     Object.keys(accountData).forEach(key => {
+      // Skip acct_industry and acct_sub_industry for distributors with industries
+      if (isDistributor && (key === 'acct_industry' || key === 'acct_sub_industry')) {
+        console.log('Skipping field for distributor:', key)
+        return
+      }
+
       // Always include 'industries' field for distributor accounts (JSONB field, not in field configs)
       // Only process fields that are in the enabled configuration OR special fields like 'industries'
       if (enabledFieldNames.has(key) || key === 'industries') {
@@ -156,6 +176,12 @@ export async function POST(request: NextRequest) {
     const insertData: any = {
       company_id: companyId,
       ...cleanedAccountData
+    }
+
+    // For distributors, ensure acct_industry and acct_sub_industry are NULL
+    if (cleanedAccountData.account_type === 'Distributor' && cleanedAccountData.industries) {
+      insertData.acct_industry = null
+      insertData.acct_sub_industry = null
     }
 
     // Only add owner_id and created_by if those fields are enabled
@@ -274,25 +300,35 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    console.log('=== DELETE /api/accounts - REQUEST RECEIVED ===')
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
-    
+    const companyId = searchParams.get('companyId')
+
+    console.log('Account ID:', id)
+    console.log('Company ID:', companyId)
+
     if (!id) {
+      console.log('Error: Account ID is missing')
       return NextResponse.json({ error: 'Account ID is required' }, { status: 400 })
     }
-    
+
+    console.log('Attempting to delete account:', id)
+
     const { error } = await supabase
       .from('accounts')
       .delete()
       .eq('id', id)
-    
+
     if (error) {
-      console.error('Error deleting account:', error)
+      console.error('Error deleting account from database:', error)
+      console.error('Error details:', JSON.stringify(error, null, 2))
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
-    
+
+    console.log('Account deleted successfully:', id)
     return NextResponse.json({ success: true })
-    
+
   } catch (error: any) {
     console.error('DELETE account error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

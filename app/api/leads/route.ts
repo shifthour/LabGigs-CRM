@@ -77,19 +77,68 @@ export async function POST(request: NextRequest) {
       (fieldConfigs || []).map(config => config.field_name)
     )
 
+    // Helper function to check if a value is a UUID
+    const isUUID = (value: any) => {
+      if (typeof value !== 'string') return false
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+    }
+
+    // If 'account' field contains a UUID, it's from form dropdown - need to lookup account name
+    if (leadData.account && isUUID(leadData.account)) {
+      const { data: account } = await supabase
+        .from('accounts')
+        .select('account_name')
+        .eq('id', leadData.account)
+        .eq('company_id', companyId)
+        .single()
+
+      if (account) {
+        leadData.account_id = leadData.account
+        leadData.account_name = account.account_name
+        delete leadData.account // Remove the UUID from account field
+      }
+    }
+
+    // If 'contact' field contains a UUID, it's from form dropdown - need to lookup contact name
+    if (leadData.contact && isUUID(leadData.contact)) {
+      const { data: contact } = await supabase
+        .from('contacts')
+        .select('first_name, last_name')
+        .eq('id', leadData.contact)
+        .eq('company_id', companyId)
+        .single()
+
+      if (contact) {
+        leadData.contact_id = leadData.contact
+        leadData.contact_name = `${contact.first_name} ${contact.last_name}`.trim()
+        delete leadData.contact // Remove the UUID from contact field
+      }
+    }
+
     // Separate standard fields from custom fields
     // Only include fields that are enabled in the configuration
     const standardFields: any = {}
     const customFields: any = {}
 
     Object.keys(leadData).forEach(key => {
-      // Only process fields that are enabled
-      if (enabledFieldNames.has(key)) {
+      // Map field config names to database column names
+      let dbFieldName = key
+      if (key === 'account') dbFieldName = 'account_name'
+      if (key === 'contact') dbFieldName = 'contact_name'
+
+      // Always include account_id and contact_id even if not in field configs (they're relational IDs)
+      const isRelationalId = key === 'account_id' || key === 'contact_id'
+
+      // Only process fields that are enabled (or are mapped fields or relational IDs)
+      if (isRelationalId || enabledFieldNames.has(key) || enabledFieldNames.has(dbFieldName)) {
         const value = leadData[key]
         const cleanedValue = (value === '' || value === undefined) ? null :
                            (typeof value === 'string' && value.trim() === '') ? null : value
 
-        if (STANDARD_LEAD_FIELDS.includes(key)) {
+        // For standard fields and relational IDs, use the appropriate column name
+        if (STANDARD_LEAD_FIELDS.includes(dbFieldName)) {
+          standardFields[dbFieldName] = cleanedValue
+        } else if (key === 'account_id' || key === 'contact_id') {
           standardFields[key] = cleanedValue
         } else {
           // Store non-standard fields in custom_fields
@@ -219,19 +268,68 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    // Helper function to check if a value is a UUID
+    const isUUID = (value: any) => {
+      if (typeof value !== 'string') return false
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+    }
+
+    // If 'account' field contains a UUID, it's from form dropdown - need to lookup account name
+    if (leadData.account && isUUID(leadData.account)) {
+      const { data: account } = await supabase
+        .from('accounts')
+        .select('account_name')
+        .eq('id', leadData.account)
+        .eq('company_id', companyId)
+        .single()
+
+      if (account) {
+        leadData.account_id = leadData.account
+        leadData.account_name = account.account_name
+        delete leadData.account // Remove the UUID from account field
+      }
+    }
+
+    // If 'contact' field contains a UUID, it's from form dropdown - need to lookup contact name
+    if (leadData.contact && isUUID(leadData.contact)) {
+      const { data: contact } = await supabase
+        .from('contacts')
+        .select('first_name, last_name')
+        .eq('id', leadData.contact)
+        .eq('company_id', companyId)
+        .single()
+
+      if (contact) {
+        leadData.contact_id = leadData.contact
+        leadData.contact_name = `${contact.first_name} ${contact.last_name}`.trim()
+        delete leadData.contact // Remove the UUID from contact field
+      }
+    }
+
     // Separate standard fields from custom fields
     // Only include fields that are enabled in the configuration
     const standardFields: any = {}
     const customFields: any = {}
 
     Object.keys(leadData).forEach(key => {
-      // If we have field configurations, only process enabled fields
-      if (!enabledFieldNames || enabledFieldNames.has(key)) {
+      // Map field config names to database column names
+      let dbFieldName = key
+      if (key === 'account') dbFieldName = 'account_name'
+      if (key === 'contact') dbFieldName = 'contact_name'
+
+      // Always include account_id and contact_id even if not in field configs (they're relational IDs)
+      const isRelationalId = key === 'account_id' || key === 'contact_id'
+
+      // If we have field configurations, only process enabled fields (or mapped fields or relational IDs)
+      if (isRelationalId || !enabledFieldNames || enabledFieldNames.has(key) || enabledFieldNames.has(dbFieldName)) {
         const value = leadData[key]
         const cleanedValue = (value === '' || value === undefined) ? null :
                            (typeof value === 'string' && value.trim() === '') ? null : value
 
-        if (STANDARD_LEAD_FIELDS.includes(key)) {
+        // For standard fields and relational IDs, use the appropriate column name
+        if (STANDARD_LEAD_FIELDS.includes(dbFieldName)) {
+          standardFields[dbFieldName] = cleanedValue
+        } else if (key === 'account_id' || key === 'contact_id') {
           standardFields[key] = cleanedValue
         } else {
           // Store non-standard fields in custom_fields
