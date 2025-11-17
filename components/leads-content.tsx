@@ -144,128 +144,37 @@ export function LeadsContent() {
 
   const loadLeads = async () => {
     try {
-      // Load ALL leads without any filtering
+      // Load ALL leads without any filtering (optimized - products fetched in single query)
       const response = await fetch(`/api/leads`)
 
       if (response.ok) {
         const apiLeads = await response.json()
 
-        // For each lead, fetch its products and contact details
-        const leadsWithProducts = await Promise.all(
-          apiLeads.map(async (lead: any) => {
-            try {
-              // Try to fetch lead products
-              const productsResponse = await fetch(`/api/leads/${lead.id}/products`)
-              let leadProducts = []
+        // Transform API data to match UI format (no additional API calls needed)
+        const transformedLeads = apiLeads.map((lead: any) => {
+          // Use lead's own fields - no need to fetch separately
+          const accountName = lead.account_name || ''
 
-              if (productsResponse.ok) {
-                const responseData = await productsResponse.json()
-                leadProducts = responseData.products || responseData || []
-              }
-
-              // If no products in junction table, use legacy single product
-              if (leadProducts.length === 0 && lead.product_name) {
-                leadProducts = [{
-                  product_name: lead.product_name,
-                  quantity: lead.quantity || 1,
-                  price_per_unit: lead.price_per_unit || 0,
-                  total_amount: (lead.quantity || 1) * (lead.price_per_unit || 0)
-                }]
-              }
-
-              // Determine contact_id - newer leads use 'contact' field, older use 'contact_id'
-              const actualContactId = lead.contact_id || lead.contact
-
-              // Fetch contact details if contact_id exists
-              let contactDetails = null
-              if (actualContactId) {
-                try {
-                  const contactResponse = await fetch(`/api/contacts?companyId=${lead.company_id}`)
-                  if (contactResponse.ok) {
-                    const contacts = await contactResponse.json()
-                    const allContacts = contacts.contacts || contacts || []
-                    contactDetails = allContacts.find((c: any) => c.id === actualContactId)
-                  }
-                } catch (err) {
-                  console.error('Error fetching contact details:', err)
-                }
-              }
-
-              // Fetch account details if account_id exists
-              let accountDetails = null
-              const actualAccountId = lead.account_id || lead.account
-              if (actualAccountId) {
-                try {
-                  const accountResponse = await fetch(`/api/accounts?companyId=${lead.company_id}`)
-                  if (accountResponse.ok) {
-                    const accountsData = await accountResponse.json()
-                    const accounts = Array.isArray(accountsData) ? accountsData : accountsData.accounts || []
-                    accountDetails = accounts.find((a: any) => a.id === actualAccountId)
-                  }
-                } catch (err) {
-                  console.error('Error fetching account details:', err)
-                }
-              }
-
-              return {
-                ...lead,
-                leadProducts,
-                contactDetails,
-                accountDetails
-              }
-            } catch (error) {
-              console.error(`Error fetching products for lead ${lead.id}:`, error)
-              // Fallback to legacy single product
-              const fallbackProducts = lead.product_name ? [{
-                product_name: lead.product_name,
-                quantity: lead.quantity || 1,
-                price_per_unit: lead.price_per_unit || 0,
-                total_amount: (lead.quantity || 1) * (lead.price_per_unit || 0)
-              }] : []
-              return { ...lead, leadProducts: fallbackProducts }
-            }
-          })
-        )
-        
-        // Transform API data to match UI format
-        const transformedLeads = leadsWithProducts.map((lead: any) => {
-          // Use fetched account details or fallback to lead's account_name
-          const accountName = lead.accountDetails?.account_name || lead.account_name || ''
-
-          // Priority: Direct fields on lead > Contact details > Legacy fields
+          // Get contact name from lead fields
           const contactName = (lead.first_name || lead.last_name)
             ? `${lead.first_name || ''} ${lead.last_name || ''}`.trim()
-            : lead.contactDetails
-              ? `${lead.contactDetails.first_name || ''} ${lead.contactDetails.last_name || ''}`.trim()
-              : lead.contact_name || ''
+            : lead.contact_name || ''
 
-          const contactPhone = lead.phone_number || lead.contactDetails?.phone_mobile || lead.contactDetails?.phone_work || lead.phone || ''
-          const contactEmail = lead.email_address || lead.contactDetails?.email_primary || lead.email || ''
-          const contactWhatsApp = contactPhone || lead.contactDetails?.whatsapp || lead.whatsapp || ''
-          const contactDepartment = lead.department || lead.contactDetails?.department || ''
+          const contactPhone = lead.phone_number || lead.phone || ''
+          const contactEmail = lead.email_address || lead.email || ''
+          const contactWhatsApp = contactPhone || lead.whatsapp || ''
+          const contactDepartment = lead.department || ''
           const leadTitle = lead.lead_title || accountName || ''
 
-          // Debug logging
-          if (lead.id === '185c015c-6079-4303-ab01-44d120d1e3f9') {
-            console.log('DEBUG Lead Transform:', {
-              leadId: lead.id,
-              leadTitle,
-              accountName,
-              accountDetails: lead.accountDetails,
-              contactName,
-              contactPhone,
-              contactEmail,
-              department: contactDepartment,
-              rawLead: {
-                first_name: lead.first_name,
-                last_name: lead.last_name,
-                phone_number: lead.phone_number,
-                email_address: lead.email_address,
-                lead_title: lead.lead_title,
-                account: lead.account,
-                contact: lead.contact
-              }
-            })
+          // Handle products - use included data or fallback to legacy
+          let leadProducts = lead.lead_products || []
+          if (leadProducts.length === 0 && lead.product_name) {
+            leadProducts = [{
+              product_name: lead.product_name,
+              quantity: lead.quantity || 1,
+              price_per_unit: lead.price_per_unit || 0,
+              total_amount: (lead.quantity || 1) * (lead.price_per_unit || 0)
+            }]
           }
 
           return {
@@ -304,9 +213,9 @@ export function LeadsContent() {
             nextFollowupDate: lead.next_followup_date,
             notes: lead.notes,
             // Add multiple products support
-            leadProducts: lead.leadProducts || [],
-            totalProducts: lead.leadProducts?.length || 0,
-            calculatedBudget: lead.leadProducts?.reduce((sum: number, p: any) => sum + (p.total_amount || 0), 0) || lead.budget || 0
+            leadProducts: leadProducts || [],
+            totalProducts: leadProducts?.length || 0,
+            calculatedBudget: leadProducts?.reduce((sum: number, p: any) => sum + (p.total_amount || 0), 0) || lead.budget || 0
           }
         })
         
@@ -1260,8 +1169,11 @@ export function LeadsContent() {
                         leadProducts={lead.leadProducts}
                         totalBudget={lead.calculatedBudget}
                       />
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-500 space-y-1">
                         <p>Stage: {lead.leadStatus || lead.salesStage}</p>
+                        {lead.assignedTo && (
+                          <p className="font-medium">Assigned: {lead.assignedTo}</p>
+                        )}
                       </div>
                     </div>
                   </div>

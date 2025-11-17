@@ -8,10 +8,21 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 export async function GET(request: NextRequest) {
   try {
-    // Get ALL deals without filtering
+    // Get ALL deals with related data in a single query (optimized)
     let query = supabase
       .from('deals')
-      .select('*')
+      .select(`
+        *,
+        deal_products:deal_products(
+          id,
+          product_id,
+          product_name,
+          quantity,
+          price_per_unit,
+          total_amount,
+          notes
+        )
+      `)
       .order('created_at', { ascending: false })
 
     const { data: deals, error } = await query

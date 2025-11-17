@@ -104,6 +104,8 @@ export function DynamicImportModal({
           return 'Headphones, Mouse, Keyboard'
         } else if (field.field_name === 'productQuantities') {
           return '2, 5, 3'
+        } else if (field.field_name === 'assigned_to') {
+          return 'Account Name (must exist in your accounts)'
         } else if (field.field_type === 'select' && field.field_options && field.field_options.length > 0) {
           return field.field_options[0]
         } else if (field.field_type === 'email') {

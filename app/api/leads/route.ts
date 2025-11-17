@@ -8,10 +8,21 @@ const supabase = createClient(
 
 export async function GET(request: NextRequest) {
   try {
-    // Get ALL leads without filtering by company_id
+    // Get ALL leads with related data in a single query (optimized)
     const { data: leads, error } = await supabase
       .from('leads')
-      .select('*')
+      .select(`
+        *,
+        lead_products:lead_products(
+          id,
+          product_id,
+          product_name,
+          quantity,
+          price_per_unit,
+          total_amount,
+          notes
+        )
+      `)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -55,6 +66,14 @@ export async function POST(request: NextRequest) {
 
     if (!companyId) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
+    }
+
+    // Validate mandatory fields
+    if (!leadData.assigned_to) {
+      return NextResponse.json({
+        error: 'Validation Error',
+        details: 'Assigned To field is required'
+      }, { status: 400 })
     }
 
     // Fetch enabled field configurations for this company
@@ -252,6 +271,14 @@ export async function PUT(request: NextRequest) {
 
     if (!id || !companyId) {
       return NextResponse.json({ error: 'Lead ID and Company ID are required' }, { status: 400 })
+    }
+
+    // Validate mandatory fields
+    if (!leadData.assigned_to) {
+      return NextResponse.json({
+        error: 'Validation Error',
+        details: 'Assigned To field is required'
+      }, { status: 400 })
     }
 
     // Fetch enabled field configurations for this company

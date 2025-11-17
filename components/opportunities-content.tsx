@@ -203,87 +203,43 @@ export function OpportunitiesContent() {
 
   const loadDeals = async () => {
     try {
-      // Load ALL deals and accounts without any filtering - real Supabase data only
+      // Load ALL deals and accounts without any filtering (optimized - products in single query)
       const [dealsResponse, accountsResponse] = await Promise.all([
         fetch(`/api/deals`),
         fetch(`/api/accounts`)
       ])
-      
+
       if (dealsResponse.ok) {
         const data = await dealsResponse.json()
         const dealsArray = data.deals || []
-        
-        // For each deal, fetch its products and contact details
-        const dealsWithProducts = await Promise.all(
-          dealsArray.map(async (deal: any) => {
-            try {
-              // Try to fetch deal products
-              const productsResponse = await fetch(`/api/deals/${deal.id}/products`)
-              let dealProducts = []
 
-              if (productsResponse.ok) {
-                dealProducts = await productsResponse.json()
-              }
+        // Transform deals with products already included (no additional API calls)
+        const dealsWithProducts = dealsArray.map((deal: any) => {
+          // Handle products - use included data or fallback to legacy
+          let dealProducts = deal.deal_products || []
+          if (dealProducts.length === 0 && deal.product) {
+            dealProducts = [{
+              product_name: deal.product,
+              quantity: deal.quantity || 1,
+              price_per_unit: deal.price_per_unit || (deal.value || 0),
+              total_amount: deal.value || 0
+            }]
+          }
 
-              // If no products in junction table, use legacy single product
-              if (dealProducts.length === 0 && deal.product) {
-                dealProducts = [{
-                  product_name: deal.product,
-                  quantity: deal.quantity || 1,
-                  price_per_unit: deal.price_per_unit || (deal.value || 0),
-                  total_amount: deal.value || 0
-                }]
-              }
+          // Use deal's own contact fields
+          const contactPhone = deal.phone_number || deal.phone || ''
+          const contactEmail = deal.email_address || deal.email || ''
 
-              // Fetch contact details to get phone and email
-              let contactPhone = deal.phone || ''
-              let contactEmail = deal.email || ''
+          return {
+            ...deal,
+            phone: contactPhone,
+            email: contactEmail,
+            dealProducts,
+            totalProducts: dealProducts.length,
+            calculatedValue: dealProducts.reduce((sum: number, p: any) => sum + (p.total_amount || 0), 0) || deal.value || 0
+          }
+        })
 
-              if (deal.contact_id) {
-                try {
-                  const contactResponse = await fetch(`/api/contacts?companyId=${deal.company_id}`)
-                  if (contactResponse.ok) {
-                    const contacts = await contactResponse.json()
-                    const allContacts = contacts.contacts || contacts || []
-                    const contactDetails = allContacts.find((c: any) => c.id === deal.contact_id)
-
-                    if (contactDetails) {
-                      contactPhone = deal.phone || contactDetails.phone_mobile || contactDetails.phone_work || ''
-                      contactEmail = deal.email || contactDetails.email_primary || contactDetails.email || ''
-                    }
-                  }
-                } catch (err) {
-                  console.error('Error fetching contact details for deal:', err)
-                }
-              }
-
-              return {
-                ...deal,
-                phone: contactPhone,
-                email: contactEmail,
-                dealProducts,
-                totalProducts: dealProducts.length,
-                calculatedValue: dealProducts.reduce((sum: number, p: any) => sum + (p.total_amount || 0), 0) || deal.value || 0
-              }
-            } catch (error) {
-              console.error(`Error fetching products for deal ${deal.id}:`, error)
-              // Fallback to legacy single product
-              const fallbackProducts = deal.product ? [{
-                product_name: deal.product,
-                quantity: deal.quantity || 1,
-                price_per_unit: deal.price_per_unit || (deal.value || 0),
-                total_amount: deal.value || 0
-              }] : []
-              return {
-                ...deal,
-                dealProducts: fallbackProducts,
-                totalProducts: fallbackProducts.length,
-                calculatedValue: deal.value || 0
-              }
-            }
-          })
-        )
-        
         console.log("loadDeals - API deals with products:", dealsWithProducts)
         console.log("First deal phone/email check:", dealsWithProducts[0]?.phone, dealsWithProducts[0]?.email)
         setDeals(dealsWithProducts)
@@ -786,8 +742,11 @@ export function OpportunitiesContent() {
                               dealProducts={deal.dealProducts}
                               totalValue={deal.calculatedValue || deal.value}
                             />
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-gray-500 space-y-1">
                               <p>Stage: {deal.stage}</p>
+                              {deal.assigned_to && (
+                                <p className="font-medium">Assigned: {deal.assigned_to}</p>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1060,6 +1019,21 @@ export function OpportunitiesContent() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-assignedTo">Assigned To</Label>
+                <Select defaultValue={selectedDeal.assigned_to || ''}>
+                  <SelectTrigger id="edit-assignedTo">
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((account: any) => (
+                      <SelectItem key={account.id} value={account.accountName}>
+                        {account.accountName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="col-span-2 space-y-2">
                 <Label htmlFor="edit-notes">Notes</Label>
                 <Textarea id="edit-notes" defaultValue={selectedDeal.notes} placeholder="Enter any additional notes" />
@@ -1074,7 +1048,8 @@ export function OpportunitiesContent() {
               if (selectedDeal) {
                 const stageSelect = document.getElementById('edit-stage') as HTMLSelectElement
                 const prioritySelect = document.getElementById('edit-priority') as HTMLSelectElement
-                
+                const assignedToSelect = document.getElementById('edit-assignedTo') as HTMLSelectElement
+
                 const formData = {
                   deal_name: `${(document.getElementById('edit-accountName') as HTMLInputElement)?.value || selectedDeal.account_name} - ${(document.getElementById('edit-product') as HTMLInputElement)?.value || selectedDeal.product}`,
                   account_name: (document.getElementById('edit-accountName') as HTMLInputElement)?.value || selectedDeal.account_name,
@@ -1085,6 +1060,7 @@ export function OpportunitiesContent() {
                   probability: parseInt((document.getElementById('edit-probability') as HTMLInputElement)?.value || selectedDeal.probability.toString()),
                   expected_close_date: (document.getElementById('edit-closeDate') as HTMLInputElement)?.value || selectedDeal.expected_close_date,
                   priority: prioritySelect?.value || selectedDeal.priority,
+                  assigned_to: assignedToSelect?.value || selectedDeal.assigned_to,
                   notes: (document.getElementById('edit-notes') as HTMLTextAreaElement)?.value || selectedDeal.notes,
                   last_activity: 'Updated'
                 }

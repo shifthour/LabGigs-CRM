@@ -446,6 +446,16 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
       return
     }
 
+    if (!formData.assignedTo) {
+      console.log('Validation failed: Missing assigned to')
+      toast({
+        title: "Validation Error",
+        description: "Please select who this lead is assigned to",
+        variant: "destructive"
+      })
+      return
+    }
+
     if (selectedProducts.length === 0) {
       console.log('Validation failed: No products selected')
       toast({
@@ -896,19 +906,19 @@ export function AddLeadModalSimplified({ isOpen, onClose, onSave, editingLead }:
           {/* Assigned To */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="assignedTo">Assigned To</Label>
-              <Select 
-                value={formData.assignedTo} 
+              <Label htmlFor="assignedTo">Assigned To *</Label>
+              <Select
+                value={formData.assignedTo}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, assignedTo: value }))}
                 disabled={isSubmitting}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select assignee" />
+                  <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.full_name}>
-                      {user.full_name}
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.accountName}>
+                      {account.accountName}
                     </SelectItem>
                   ))}
                 </SelectContent>
